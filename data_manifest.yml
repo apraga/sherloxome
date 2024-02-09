@@ -1,0 +1,40 @@
+files:
+- path: giab/HG002_GRCh38_1_22_v4.2.1_benchmark.bed
+  tracked: false
+  md5: 97265e922a97c69a0391cf3f92a89b8b
+  size: 11494021
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/latest/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
+- path: giab/HG003_GRCh38_1_22_v4.2.1_benchmark.bed
+  tracked: false
+  md5: 26f7a0a353c653e4e2979654586110b1
+  size: 13219856
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG003_NA24149_father/latest/GRCh38/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
+- path: giab/HG007_GRCh38_1_22_v4.2.1_benchmark.bed
+  tracked: false
+  md5: 6239fad8618396f9f6a269070fede44b
+  size: 16208979
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG007_NA24695_mother/latest/GRCh38/HG007_GRCh38_1_22_v4.2.1_benchmark.bed
+- path: giab/HG005_GRCh38_1_22_v4.2.1_benchmark.bed
+  tracked: false
+  md5: f06ec2339592168a75ad4236b87cb2a3
+  size: 18615340
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/latest/GRCh38/HG005_GRCh38_1_22_v4.2.1_benchmark.bed
+- path: giab/HG006_GRCh38_1_22_v4.2.1_benchmark.bed
+  tracked: false
+  md5: 4c189e07c6d746b61a12b2ef38a4eea2
+  size: 15762527
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG006_NA24694_father/latest/GRCh38/HG006_GRCh38_1_22_v4.2.1_benchmark.bed
+- path: giab/HG001_GRCh38_1_22_v4.2.1_benchmark.bed
+  tracked: false
+  md5: e1ea90c830f981d29a46043eb618e7bf
+  size: 15479939
+  url: https://ftp-trace.ncbi.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/latest/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark.bed
+- path: giab/HG004_GRCh38_1_22_v4.2.1_benchmark.bed
+  tracked: false
+  md5: 38fcb13f53634c898c8e9aadcd0fe292
+  size: 13081043
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG004_NA24143_mother/latest/GRCh38/HG004_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
+remotes: {}
+metadata:
+  title: null
+  description: null
