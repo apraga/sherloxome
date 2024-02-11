@@ -4,6 +4,15 @@ use std::fs::File;
 use flate2::read::GzDecoder;
 use std::io;
 
+
+fn truth_vcf(patient: &str) -> String() {
+    format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz")
+}
+
+fn truth_bed(patient: &str) -> String() {}
+    format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.bed");
+}
+
 fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
     let sdf = genome.with_extension("sdf");
     if !sdf.exists() {
