@@ -3,6 +3,8 @@ use std::process::Command;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
+
+
 // Return the url down to the directory level for a sets of patients
 fn root_url(sequencer: &str, capture: &str, coverage: &str) -> String {
     let root = "https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam";
@@ -12,11 +14,12 @@ fn root_url(sequencer: &str, capture: &str, coverage: &str) -> String {
 // Retur nthe bam filename
 fn bam_file(sequencer: &str, capture: &str, coverage: &str, patient: &str) -> String {
     // Underscore in filename for idt
-    if capture == "idt" {
-        format!("{patient}.{sequencer}.wes_{capture}.{coverage}.dedup.bam")
+    if capture == "idt" || 
+        (sequencer == "novaseq" && capture == "truseq" && patient != "HG006"){ 
+        format!("{patient}.{sequencer}.wes_{capture}.{coverage}.dedup.bam.bai") 
     }
-    else {
-        format!("{patient}.{sequencer}.wes-{capture}.{coverage}.dedup.grch38.bam")
+    else { 
+        format!("{patient}.{sequencer}.wes-{capture}.{coverage}.dedup.grch38.bam.bai") 
     }
 }
 

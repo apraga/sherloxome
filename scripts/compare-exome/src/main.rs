@@ -1,16 +1,59 @@
 use std::process::Command;
+use glob::glob;
+use clap::Parser;
 use std::path::{Path,PathBuf};
-use std::fs::File;
+use std::fs;
 use flate2::read::GzDecoder;
 use std::io;
 
+fn query_bed(path: &Path) -> PathBuf {
+    let path_str = path.to_str().expect("Path is not valid UTF-8").to_lowercase();
+    let capt_base = PathBuf::from("../../baid2020/bed");
 
-fn truth_vcf(patient: &str) -> String() {
-    format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz")
+    let capt_file = if path_str.contains("idt") {
+        "idt_capture.grch38.bed"
+    } else if path_str.contains("truseq") {
+        "truseq-dna-exome-targeted-regions-manifest-v1-2-hg38.bed"
+    } else {
+        println!("Agilent by default");
+        "agilent.targets.grch38.bed"
+    };
+
+    let capt = capt_base.join(capt_file);
+    assert!(capt.exists(), "Missing capture file");
+    capt
 }
 
-fn truth_bed(patient: &str) -> String() {}
-    format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.bed");
+
+fn truth_base() -> PathBuf {
+   PathBuf::from("../../baid2020/giab")
+} 
+
+fn truth_vcf(patient: &str) -> PathBuf {
+    let vcf = PathBuf::from(format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"));
+    let vcf_ = truth_base().join(vcf);
+    assert!(vcf_.exists(), "Missing truth vcf");
+    vcf_
+}
+
+fn truth_bed(patient: &str) -> PathBuf {
+    let bed = PathBuf::from(format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.bed"));
+    let bed_ = truth_base().join(bed);
+    assert!(bed_.exists());;
+    bed_
+}
+
+fn patient(vcf: &PathBuf) -> String {
+    let vcf_ = vcf.to_str().expect("Fails to convert VCF to UTF8");
+    if vcf_.contains("HG001") { "HG001"}
+    else if vcf_.contains("HG001") { "HG001"}
+    else if vcf_.contains("HG002") { "HG002"}
+    else if vcf_.contains("HG003") { "HG003"}
+    else if vcf_.contains("HG004") { "HG004"}
+    else if vcf_.contains("HG005") { "HG005"}
+    else if vcf_.contains("HG006") { "HG006"}
+    else if vcf_.contains("HG007") { "HG007"}
+    else { panic!("No patient found")}
 }
 
 fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
@@ -30,7 +73,7 @@ fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
     sdf
 }
 
-fn happy_vcfeval(truth_vcf: &str, truth_bed: &str, query_vcf: &str, query_bed: &str, outdir: &str, fasta: &str, fai: &str, sdf: &str) {
+fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, query_bed: &PathBuf, outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
     let summary = format!("{}.summary.csv", outdir);
     if Path::new(&summary).exists() {
         println!("Summary file already exists (summary)");
@@ -46,18 +89,6 @@ fn happy_vcfeval(truth_vcf: &str, truth_bed: &str, query_vcf: &str, query_bed: &
     }
 }
 
-fn query_bed(capture: &str) -> PathBuf {
-    match capture  {
-        "Agilent v7" => PathBuf::from( "../baid2020/bed/agilent.targets.grch38.bed"),
-        "TruSeq" => PathBuf::from("../baid2020/bed/grch38_refseq.bed"),
-        "IDT-xGen" => PathBuf::from("../baid2020/bed/idt_capture.grch38.bed"),
-        _ => {
-            println!("No BED for capture type {} !", capture);
-            std::process::exit(1);
-        }
-    }
-}
-
 fn query_vcf(sequencer: &str, capture: &str, coverage: &str, patient: &str, caller: &str) -> PathBuf {
     let root = PathBuf::from("../baid2020/grch38/vcf")
         .join(sequencer)
@@ -70,10 +101,10 @@ fn query_vcf(sequencer: &str, capture: &str, coverage: &str, patient: &str, call
 fn extract_fasta(fasta_gz: &PathBuf) -> PathBuf {
     let fasta = fasta_gz.with_extension("");
     if !fasta.exists() {
-        let gz_file = File::open(fasta_gz)
+        let gz_file = fs::File::open(fasta_gz)
             .expect("Fails to read gzip fasta");
         let mut gz_decoder = GzDecoder::new(gz_file);
-        let mut file = File::create(fasta.clone())
+        let mut file = fs::File::create(fasta.clone())
             .expect("Fails to create fasta");
         io::copy(&mut gz_decoder, &mut file)
             .expect("failed to extract fasta");
@@ -85,11 +116,47 @@ fn extract_fasta(fasta_gz: &PathBuf) -> PathBuf {
     fasta
 }
 
-fn main() {
-    println!("Hi");
+
+fn compare(indir: &str, outdir: &PathBuf) {
     let genome = PathBuf::from("../../genome/GCA_000001405.15_GRCh38_full_analysis_set.fna.gz");
+    assert!(genome.exists(), "Missing genome");
     let fasta = extract_fasta(&genome);
     let sdf = fasta_to_sdf(&fasta);
+
+    let expr = format!("{}/**/HG*.vcf", indir);
+    for entry in glob(&expr).expect("Fails to find vcf") {
+        compare_vcf(entry.unwrap(), &outdir, &fasta, &sdf);
+    }
+}
+
+fn compare_vcf(entry: &PathBuf, outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
+    let patient = patient(&entry);
+    let vcf_truth = truth_vcf(&patient);
+    let bed_truth = truth_bed(&patient);
+    let bed_query = query_bed(&entry);
+    happy_vcfeval(&vcf_truth, &bed_truth, &entry, &bed_query, &outdir, &fasta, &fai, &sdf);
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Directory searched for vcf files (recursive)
+    #[arg(short, long)]
+    dir: String,
+
+    /// Output directory
+    #[arg(short, long)]
+    out: String,
+}
+
+
+fn main() {
+    let args = Args::parse();
+
+    let outdir = PathBuf::from(&args.out);
+    fs::create_dir_all(&outdir).expect("Failed to create output dir");
+
+    compare(&args.dir, &outdir);
     // println!("{}", genome.exists());
     // println!("{}", query_vcf("hiseq4000", "agilent", "50x", "HG001", "gatk4").display());
 }
