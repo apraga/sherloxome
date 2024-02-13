@@ -1,10 +1,12 @@
-use std::process::Command;
-use glob::glob;
 use clap::Parser;
-use std::path::{Path,PathBuf};
-use std::fs;
 use flate2::read::GzDecoder;
+use glob::glob;
+use std::fs;
 use std::io;
+use std::path::{Path,PathBuf};
+use std::process::Command;
+use rayon::iter::{ParallelIterator, IntoParallelIterator};
+
 
 fn query_bed(path: &Path) -> PathBuf {
     let path_str = path.to_str().expect("Path is not valid UTF-8").to_lowercase();
@@ -15,7 +17,6 @@ fn query_bed(path: &Path) -> PathBuf {
     } else if path_str.contains("truseq") {
         "truseq-dna-exome-targeted-regions-manifest-v1-2-hg38.bed"
     } else {
-        println!("Agilent by default");
         "agilent.targets.grch38.bed"
     };
 
@@ -24,7 +25,7 @@ fn query_bed(path: &Path) -> PathBuf {
 
 
 fn truth_base() -> PathBuf {
-   PathBuf::from("../../baid2020/giab")
+   PathBuf::from("../../giab")
 } 
 
 fn truth_vcf(patient: &str) -> PathBuf {
@@ -66,27 +67,38 @@ fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
     sdf
 }
 
+// Manage double extensions like .tar.gz
+fn filename(vcf: &PathBuf) -> Option<String> {
+    let stem = vcf.file_stem()?.to_owned();
+    let double_stem = PathBuf::from(stem).file_stem()?.to_str()?.to_owned();
+    Some(double_stem)
+}
+
 fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, query_bed: &PathBuf, 
-                    out: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
-    let summary = out.join(".summary.csv");
-    if summary.exists() {
+                    outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
+    let prefix = filename(query_vcf).unwrap();
+    let out = outdir.join(prefix);
+    if out.join(".summary.csv").exists() {
         println!("Summary file already exists (summary)");
     } else {
-        let args = ["hap.py", 
-                    truth_vcf.to_str().unwrap(), 
+        println!("Processing {:?}", query_vcf);
+        let args = [truth_vcf.to_str().unwrap(), 
                     query_vcf.to_str().unwrap(), 
-                    "-o", out.to_str().unwrap(), 
                     "--false-positives", truth_bed.to_str().unwrap(), 
                     "--target-regions", query_bed.to_str().unwrap(), 
                     "--reference", fasta.to_str().unwrap(),
                     "--engine=vcfeval",
-                    "--engine-vcfeval-template", sdf.to_str().unwrap()];
-        let output = Command::new("sleep 10")
-            // .args(&args)
+                    "--engine-vcfeval-template", sdf.to_str().unwrap(),
+                    "-o", out.to_str().unwrap()];
+        let output = Command::new("hap.py")
+            .args(&args)
             .output()
             .expect("Failed to run hap.py from rust");
         if !output.status.success() {
             println!("Happy fails to execute:");
+            println!("{:?}", String::from_utf8(output.stderr))
+        }
+        else {
             println!("{:?}", String::from_utf8(output.stdout))
         }
     }
@@ -117,10 +129,13 @@ fn compare(indir: &str, outdir: &PathBuf) {
     let fasta = extract_fasta(&genome);
     let sdf = fasta_to_sdf(&fasta);
 
-    let expr = format!("{}/**/HG*.vcf", indir);
-    for entry in glob(&expr).expect("Fails to find vcf") {
-        compare_vcf(&entry.unwrap(), &outdir, &fasta, &sdf);
-    }
+    let expr = format!("{}/**/HG*.vcf.gz", indir);
+    let files: Vec<_> = glob(&expr).expect("Fails to find vcf").collect(); 
+    assert!(!files.is_empty(), "Found no files matching {}", expr);
+
+    files.into_par_iter().for_each(|x|  {
+        compare_vcf(&x.unwrap(), &outdir, &fasta, &sdf);
+    });
 }
 
 fn compare_vcf(entry: &PathBuf, outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
@@ -154,6 +169,4 @@ fn main() {
     fs::create_dir_all(&outdir).expect("Failed to create output dir");
 
     compare(&args.dir, &outdir);
-    // println!("{}", genome.exists());
-    // println!("{}", query_vcf("hiseq4000", "agilent", "50x", "HG001", "gatk4").display());
 }
