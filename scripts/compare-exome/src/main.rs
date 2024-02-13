@@ -19,9 +19,7 @@ fn query_bed(path: &Path) -> PathBuf {
         "agilent.targets.grch38.bed"
     };
 
-    let capt = capt_base.join(capt_file);
-    assert!(capt.exists(), "Missing capture file");
-    capt
+     capt_base.join(capt_file)
 }
 
 
@@ -31,28 +29,23 @@ fn truth_base() -> PathBuf {
 
 fn truth_vcf(patient: &str) -> PathBuf {
     let vcf = PathBuf::from(format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"));
-    let vcf_ = truth_base().join(vcf);
-    assert!(vcf_.exists(), "Missing truth vcf");
-    vcf_
+    truth_base().join(vcf)
 }
 
 fn truth_bed(patient: &str) -> PathBuf {
     let bed = PathBuf::from(format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.bed"));
-    let bed_ = truth_base().join(bed);
-    assert!(bed_.exists());;
-    bed_
+    truth_base().join(bed)
 }
 
 fn patient(vcf: &PathBuf) -> String {
     let vcf_ = vcf.to_str().expect("Fails to convert VCF to UTF8");
-    if vcf_.contains("HG001") { "HG001"}
-    else if vcf_.contains("HG001") { "HG001"}
-    else if vcf_.contains("HG002") { "HG002"}
-    else if vcf_.contains("HG003") { "HG003"}
-    else if vcf_.contains("HG004") { "HG004"}
-    else if vcf_.contains("HG005") { "HG005"}
-    else if vcf_.contains("HG006") { "HG006"}
-    else if vcf_.contains("HG007") { "HG007"}
+    if vcf_.contains("HG001") { String::from("HG001")}
+    else if vcf_.contains("HG002") { String::from("HG002")}
+    else if vcf_.contains("HG003") { String::from("HG003")}
+    else if vcf_.contains("HG004") { String::from("HG004")}
+    else if vcf_.contains("HG005") { String::from("HG005")}
+    else if vcf_.contains("HG006") { String::from("HG006")}
+    else if vcf_.contains("HG007") { String::from("HG007")}
     else { panic!("No patient found")}
 }
 
@@ -73,29 +66,30 @@ fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
     sdf
 }
 
-fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, query_bed: &PathBuf, outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
-    let summary = format!("{}.summary.csv", outdir);
-    if Path::new(&summary).exists() {
+fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, query_bed: &PathBuf, 
+                    out: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
+    let summary = out.join(".summary.csv");
+    if summary.exists() {
         println!("Summary file already exists (summary)");
     } else {
-        let args = ["hap.py", truth_vcf, query_vcf, "-o", outdir, "--false-positives", truth_bed, 
-                "--target-regions", query_bed, "--reference", fasta,
-                "--engine=vcfeval",
-                "--engine-vcfeval-template", sdf];
+        let args = ["hap.py", 
+                    truth_vcf.to_str().unwrap(), 
+                    query_vcf.to_str().unwrap(), 
+                    "-o", out.to_str().unwrap(), 
+                    "--false-positives", truth_bed.to_str().unwrap(), 
+                    "--target-regions", query_bed.to_str().unwrap(), 
+                    "--reference", fasta.to_str().unwrap(),
+                    "--engine=vcfeval",
+                    "--engine-vcfeval-template", sdf.to_str().unwrap()];
         let output = Command::new("hap.py")
             .args(&args)
             .output()
-            .expect("Failed to execute command");
+            .expect("Failed to run hap.py from rust");
+        if !output.status.success() {
+            println!("Happy fails to execute:");
+            println!("{:?}", String::from_utf8(output.stdout))
+        }
     }
-}
-
-fn query_vcf(sequencer: &str, capture: &str, coverage: &str, patient: &str, caller: &str) -> PathBuf {
-    let root = PathBuf::from("../baid2020/grch38/vcf")
-        .join(sequencer)
-        .join(format!("wes_{}", capture))
-        .join(coverage);
-    let vcf =format!("{}.{}.wes-{}.{}.{}.grch38.vcf.gz", patient, sequencer, capture, coverage, caller);
-    root.join(vcf)
 }
 
 fn extract_fasta(fasta_gz: &PathBuf) -> PathBuf {
@@ -119,22 +113,25 @@ fn extract_fasta(fasta_gz: &PathBuf) -> PathBuf {
 
 fn compare(indir: &str, outdir: &PathBuf) {
     let genome = PathBuf::from("../../genome/GCA_000001405.15_GRCh38_full_analysis_set.fna.gz");
-    assert!(genome.exists(), "Missing genome");
+    assert!(genome.exists(), "Missing genome {}", genome.display());
     let fasta = extract_fasta(&genome);
     let sdf = fasta_to_sdf(&fasta);
 
     let expr = format!("{}/**/HG*.vcf", indir);
     for entry in glob(&expr).expect("Fails to find vcf") {
-        compare_vcf(entry.unwrap(), &outdir, &fasta, &sdf);
+        compare_vcf(&entry.unwrap(), &outdir, &fasta, &sdf);
     }
 }
 
 fn compare_vcf(entry: &PathBuf, outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
     let patient = patient(&entry);
     let vcf_truth = truth_vcf(&patient);
+    assert!(vcf_truth.exists(), "Missing truth vcf {}", vcf_truth.display());
     let bed_truth = truth_bed(&patient);
+    assert!(bed_truth.exists(), "Missing truth bed {}", bed_truth.display());
     let bed_query = query_bed(&entry);
-    happy_vcfeval(&vcf_truth, &bed_truth, &entry, &bed_query, &outdir, &fasta, &fai, &sdf);
+    assert!(bed_query.exists(), "Missing query bed {}", bed_query.display());
+    happy_vcfeval(&vcf_truth, &bed_truth, &entry, &bed_query, &outdir, &fasta, &sdf);
 }
 
 #[derive(Parser, Debug)]
