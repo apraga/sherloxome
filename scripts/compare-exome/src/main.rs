@@ -81,8 +81,8 @@ fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, 
                     "--reference", fasta.to_str().unwrap(),
                     "--engine=vcfeval",
                     "--engine-vcfeval-template", sdf.to_str().unwrap()];
-        let output = Command::new("hap.py")
-            .args(&args)
+        let output = Command::new("sleep 10")
+            // .args(&args)
             .output()
             .expect("Failed to run hap.py from rust");
         if !output.status.success() {
