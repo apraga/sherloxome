@@ -74,6 +74,9 @@ fn filename(vcf: &PathBuf) -> Option<String> {
     Some(double_stem)
 }
 
+// Run happy with vcfeval (see for example the nix package)
+// We parallelize over the number of VCF. rtg is run as single thread for now.
+// Warning : --threads must be set, otherwise the default value on some cluster may cause it to fail.
 fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, query_bed: &PathBuf, 
                     outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
     let prefix = filename(query_vcf).unwrap();
@@ -89,6 +92,7 @@ fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, 
                     "--reference", fasta.to_str().unwrap(),
                     "--engine=vcfeval",
                     "--engine-vcfeval-template", sdf.to_str().unwrap(),
+                    "--threads", "1", // Must be set
                     "-o", out.to_str().unwrap()];
         let output = Command::new("hap.py")
             .args(&args)
