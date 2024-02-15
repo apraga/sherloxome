@@ -1,0 +1,7 @@
+doc/book
+
+target/
+
+scripts/compare-exome/giab-*
+baid2020
+giab
