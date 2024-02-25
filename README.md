@@ -1,1 +1,1 @@
-See documentation in Github page (TODO)
+See documentation in https://apraga.github.io/exomevalidator.
