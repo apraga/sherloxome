@@ -1,0 +1,1079 @@
+diff --git a/bin/muteditor.py b/bin/muteditor.py
+index eab91a3..fd9c87f 100755
+--- a/bin/muteditor.py
++++ b/bin/muteditor.py
+@@ -25,12 +25,12 @@ def main(run_args):
+     invalid_log = InvalidLog(invalid_log_file)
+ 
+     # step1: deal with mutfile and get haplotypes
+-    print "step1: deal with mutfile and get haplotypes"
++    print("step1: deal with mutfile and get haplotypes")
+     haplotype_list = get_haplotypes(run_args.bamfile, run_args.reffasta, run_args.mutfile, int(run_args.haplosize),
+                                     float(run_args.snpfrac), invalid_log)
+ 
+     # step2: deal haplotypes and get total_chosen_reads, total_chosen_reads_muts
+-    print "step2: deal haplotypes and get total_chosen_reads, total_chosen_reads_muts"
++    print("step2: deal haplotypes and get total_chosen_reads, total_chosen_reads_muts")
+     success_list_file = os.path.join(run_args.outdir, 'success_list.txt')
+     total_chosen_reads, total_chosen_reads_muts = deal_haplotype_multi(run_args.bamfile, haplotype_list,
+                                                                        temp_out_dir, run_args.reffasta,
+@@ -45,22 +45,22 @@ def main(run_args):
+                                                                        success_list_file)
+     invalid_log.close()
+     if len(total_chosen_reads) == 0:
+-        print "Warning: No reads to deal with of all these sv, checkout your sv file"
++        print("Warning: No reads to deal with of all these sv, checkout your sv file")
+         return
+ 
+     # step3: modify the reads in total_chosen_reads itself
+-    print "step3: modify the reads in total_chosen_reads itself"
++    print("step3: modify the reads in total_chosen_reads itself")
+     reads_modify(total_chosen_reads, total_chosen_reads_muts, run_args.reffasta, int(run_args.process))
+ 
+     # step4: write edited reads to edited file and exclude reads to exclude file ,than remap edited file to reference
+-    print "step4: write edited reads to edited file and exclude reads to exclude file ,than remap edited file to reference"
++    print("step4: write edited reads to edited file and exclude reads to exclude file ,than remap edited file to reference")
+     edit_remap_bam_file, exclude_bam_file = reads_replace(run_args.bamfile, total_chosen_reads, run_args.seqer,
+                                                           run_args.floworder, run_args.libkey, run_args.barcode,
+                                                           run_args.tag, temp_out_dir, run_args.aligner,
+                                                           run_args.alignerIndex, run_args.single)
+ 
+     # step5: merge remap.edit.bam and exclude exclude.bam and sort
+-    print "step5: merge remap.edit.bam and exclude exclude.bam and sort"
++    print("step5: merge remap.edit.bam and exclude exclude.bam and sort")
+     # edit_remap_bam_file, exclude_bam_file = os.path.join(temp_out_dir, "edit.remap.sort.bam"), os.path.join(
+     #     temp_out_dir, "exclude.bam")
+     out_bam_file = os.path.join(run_args.outdir, "edit.sorted.bam")
+@@ -68,8 +68,8 @@ def main(run_args):
+     bamIndex(out_bam_file)
+     end_time = time.asctime(time.localtime(time.time()))
+     # speed_time = end_time - start_time
+-    print "Edit Bam is completed! Result see %s and valid mutation see %s. Invalid mutation can't be spike in see %s." % (
+-        out_bam_file, success_list_file, invalid_log_file)
++    print(("Edit Bam is completed! Result see %s and valid mutation see %s. Invalid mutation can't be spike in see %s." % (
++        out_bam_file, success_list_file, invalid_log_file)))
+ 
+ 
+ def run():
+diff --git a/bin/sveditor.py b/bin/sveditor.py
+index a8820a9..d328847 100755
+--- a/bin/sveditor.py
++++ b/bin/sveditor.py
+@@ -39,11 +39,11 @@ def main(run_args):
+         exit("no sv list to deal with")
+ 
+     # step1: get insert size of paired reads
+-    print "step1: get insert size of paired reads"
++    print("step1: get insert size of paired reads")
+     insert_size = get_insertSize_range(run_args.bamfile, run_args.readlength, run_args.single)
+ 
+     # step2: deal with sv and get total edited reads
+-    print "step2: deal with sv and get total edited reads"
++    print("step2: deal with sv and get total edited reads")
+     success_file = os.path.join(run_args.outdir, 'success_list.txt')
+     total_modify_reads_file, total_delete_reads_file, total_add_reads_file, total_modify_list, total_delete_list, total_add_list = deal_sv(
+         run_args.bamfile, run_args.reffasta, sv_list,
+@@ -60,7 +60,7 @@ def main(run_args):
+     invalid_log.close()
+ 
+     # step3: get reads by region bed and write bam file
+-    print "step3: get reads by region bed and write bam file"
++    print("step3: get reads by region bed and write bam file")
+     chrom_list, used_bam_file_tmp, exclude_bam_file_tmp = get_reads_by_region(run_args.bamfile, sv_list,
+                                                                               temp_out_dir)
+ 
+@@ -71,7 +71,7 @@ def main(run_args):
+                                                     int(run_args.process))
+ 
+     # step4: merge edited reads and remap to new bam, consider about the tag, RG, life reads
+-    print "step4: merge edited reads and remap to new bam, consider about the tag, RG, life reads"
++    print("step4: merge edited reads and remap to new bam, consider about the tag, RG, life reads")
+     edit_remap_bam_file = merge_edit_bam(run_args.bamfile, temp_out_dir, run_args.single, total_modify_reads_file,
+                                          total_add_reads_file, used_bam_file, total_modify_list, total_add_list,
+                                          run_args.seqer, run_args.aligner, run_args.alignerIndex,
+@@ -79,7 +79,7 @@ def main(run_args):
+                                          run_args.libkey, run_args.barcode, run_args.tag)
+ 
+     # step5: remapped edit reads and merge
+-    print "step5: remapped edit reads and merge"
++    print("step5: remapped edit reads and merge")
+     out_bam_file = os.path.join(run_args.outdir, "edit.sorted.bam")
+     bamMerge([edit_remap_bam_file, exclude_bam_file], out_bam_file)
+     bamIndex(out_bam_file)
+@@ -87,8 +87,8 @@ def main(run_args):
+     end_time = time.asctime(time.localtime(time.time()))
+     # print end_time
+     # speed_time = end_time - start_time
+-    print "Edit Bam is completed! Result see %s and valid mutation see %s. Invalid mutation can't be spike in see %s." % (
+-        out_bam_file, success_file, invalid_log_file)
++    print("Edit Bam is completed! Result see %s and valid mutation see %s. Invalid mutation can't be spike in see %s." % (
++        out_bam_file, success_file, invalid_log_file))
+ 
+ 
+ def run():
+diff --git a/src/random_select.py b/src/random_select.py
+index 272c024..531b30f 100755
+--- a/src/random_select.py
++++ b/src/random_select.py
+@@ -8,7 +8,7 @@ def choose(fileName, chooseNum, outFile):
+         lineList = fin.readlines()
+ 
+     fin.close()
+-    print len(lineList), type(lineList)
++    print(len(lineList), type(lineList))
+     randomLines = random.sample(lineList, chooseNum)
+     with open(outFile, 'w') as fout:
+         for line in randomLines:
+@@ -19,7 +19,7 @@ if len(sys.argv) == 4:
+     fileName = sys.argv[1]
+     chooseNum = int(sys.argv[2])
+     outFile = sys.argv[3]
+-    print fileName, chooseNum, outFile
++    print(fileName, chooseNum, outFile)
+     choose(fileName, chooseNum, outFile)
+ else:
+     sys.exit("usage: %s <filename> <Choose number> <output filename with path> " % sys.argv[0])
+diff --git a/src/rename_reads.py b/src/rename_reads.py
+index ca26982..bf37ce1 100755
+--- a/src/rename_reads.py
++++ b/src/rename_reads.py
+@@ -8,7 +8,7 @@ from uuid import uuid4
+ 
+ 
+ if len(sys.argv) == 4:
+-    print(len(sys.argv))
++    print((len(sys.argv)))
+     assert sys.argv[1].endswith('.bam')
+     inbamfn = sys.argv[1]
+     outbamfn = sub('.bam$', '.renamereads.bam', inbamfn)
+@@ -50,7 +50,7 @@ if len(sys.argv) == 4:
+             w += 1
+ 
+         if n % 1000000 == 0:
+-            print "Processed", n, "reads:", p, "paired,", u, "unpaired,", w, "written,", m, "mates found."
++            print("Processed", n, "reads:", p, "paired,", u, "unpaired,", w, "written,", m, "mates found.")
+ 
+     outbam.close()
+     inbam.close()
+diff --git a/tests/test.py b/tests/test.py
+index e6d02c3..b3b0d74 100644
+--- a/tests/test.py
++++ b/tests/test.py
+@@ -8,7 +8,7 @@ ori = '208,-2,196,-2,14,208,-12,258,-2,240,208,4,518,460,36,-6,284,-4,16,496,6,2
+ origFlowSignal = [ int(x) for x in ori.split(",")]
+ from varben.common.methods import reCalculateFlowSignal
+ signal, seq = reCalculateFlowSignal(sequence, origFlowSignal, flowOrder, libKey, barcode)
+-print origFlowSignal, "!!", len(origFlowSignal)
+-print signal, len(signal)
+-print sequence, len(sequence)
+-print seq, len(seq)
++print(origFlowSignal, "!!", len(origFlowSignal))
++print(signal, len(signal))
++print(sequence, len(sequence))
++print(seq, len(seq))
+diff --git a/tests/test_calPolymorphism.py b/tests/test_calPolymorphism.py
+index d71e2d8..b61ba67 100755
+--- a/tests/test_calPolymorphism.py
++++ b/tests/test_calPolymorphism.py
+@@ -23,7 +23,7 @@ for read in bam.fetch(chrom, start, end + 1):
+                 #if nul in 'ATCG':
+                 #    numDict[pair[1]][nul] += 1
+                 if nul in 'TCG' and pos < 10:
+-                    print( "[POSITON: "+str(pos) +"]\t [BASE: "+ nul+ "]\t [READ: "+str(read)+"]\t READPOS: "+str(read.get_aligned_pairs())+"]\t READBASE:"+str(read.query_alignment_sequence[pos])+"]")
++                    print(( "[POSITON: "+str(pos) +"]\t [BASE: "+ nul+ "]\t [READ: "+str(read)+"]\t READPOS: "+str(read.get_aligned_pairs())+"]\t READBASE:"+str(read.query_alignment_sequence[pos])+"]"))
+                     break
+     if nul in 'TCG' and pos < 10:
+         break
+diff --git a/varben/common/bamconvert.py b/varben/common/bamconvert.py
+index 5740064..0d843a3 100644
+--- a/varben/common/bamconvert.py
++++ b/varben/common/bamconvert.py
+@@ -6,7 +6,7 @@ import os
+ 
+ 
+ def _call(cmd):
+-    print cmd
++    print(cmd)
+     flag = call(cmd, shell=True)
+     if flag == 0:
+         return True
+@@ -23,18 +23,18 @@ def bamToFastq(bamFile, outPrefix, is_single):
+         fq1 = outPrefix + ".fq"
+         fq2 = None
+         bamToFastq_cmd = "bedtools bamtofastq  -i %s -fq %s " % (bamFile, fq1)
+-    print "bam to fastq start ..................................."
++    print("bam to fastq start ...................................")
+     _call(bamToFastq_cmd)
+-    print "bam to fastq end ....................................."
++    print("bam to fastq end .....................................")
+     return fq1, fq2
+ 
+ 
+ def bamToFastq_2(bamFile, outPrefix, is_single):
+     fq1 = outPrefix + ".fq"
+     bamToFastq_cmd = "bedtools bamtofastq  -i %s -fq %s " % (bamFile, fq1)
+-    print "bam to fastq start ..................................."
++    print("bam to fastq start ...................................")
+     _call(bamToFastq_cmd)
+-    print "bam to fastq end ....................................."
++    print("bam to fastq end .....................................")
+     return fq1
+ 
+ 
+@@ -46,9 +46,9 @@ def map_bwa(ref_index, outSamFile, fq1, fq2=None, header=None, threadNum=1):
+         mapping_cmd = "bwa mem %s -t %s %s %s >%s" % (RG_head, threadNum, ref_index, fq1, outSamFile)
+     else:
+         mapping_cmd = "bwa mem %s -t %s %s %s %s >%s" % (RG_head, threadNum, ref_index, fq1, fq2, outSamFile)
+-    print "mapping by bwa start ...................................."
++    print("mapping by bwa start ....................................")
+     _call(mapping_cmd)
+-    print "mapping by bwa end ......................................"
++    print("mapping by bwa end ......................................")
+ 
+ 
+ def map_novoalign(ref_index, out_sam, fq1, fq2=None, process=1):
+@@ -58,9 +58,9 @@ def map_novoalign(ref_index, out_sam, fq1, fq2=None, process=1):
+     else:
+         # mapping_cmd = "/lustre/users/fangshuangsang/Project/simulation_mutation/softs/novocraft/novoalign -d %s -f %s %s --mCPU %s -o SAM > %s" % (ref_index, fq1, fq2, process, out_sam)
+         mapping_cmd = "novoalign -d %s -f %s %s --mCPU %s -o SAM > %s" % (ref_index, fq1, fq2, process, out_sam)
+-    print "mapping by novoalign start ...................................."
++    print("mapping by novoalign start ....................................")
+     _call(mapping_cmd)
+-    print "mapping by novoalign end ...................................."
++    print("mapping by novoalign end ....................................")
+ 
+ 
+ def samToBam(inSamFile, outBamFile):
+@@ -74,20 +74,20 @@ def bamSort(inBamFile, sortedBamFile_prefix, sort_key=None):
+         bamSort_cmd = "samtools sort -o %s %s" % (sortedBamFile_prefix + ".bam", inBamFile)
+     elif sort_key == "name":
+         bamSort_cmd = "samtools sort -n -o %s %s" % (sortedBamFile_prefix + ".bam", inBamFile)
+-    print "samtools sort start................................"
++    print("samtools sort start................................")
+     _call(bamSort_cmd)
+-    print "samtools sort end.................................."
++    print("samtools sort end..................................")
+ 
+ 
+ def bamIndex(inBamFile):
+     index_cmd = "samtools index %s" % (inBamFile)
+-    print "samtools index start .............................."
++    print("samtools index start ..............................")
+     _call(index_cmd)
+-    print "samtools index end ................................"
++    print("samtools index end ................................")
+ 
+ 
+ def remap(ref_index, inBamFile, outBamFile, aligner, is_single, header=None, sort=True, threadNum=1):
+-    print "remap start ......................................."
++    print("remap start .......................................")
+     aligner = aligner.lower()
+     prefix = outBamFile.rstrip(".bam")
+     if aligner in ("bwa", "novoalign"):
+@@ -115,13 +115,13 @@ def remap(ref_index, inBamFile, outBamFile, aligner, is_single, header=None, sor
+         remap_tmap(ref_index, inBamFile, outBamFile_tmp, threadNum)
+         bamSort(outBamFile_tmp, prefix)
+         bamIndex(outBamFile)
+-    print "remap end .........................................."
++    print("remap end ..........................................")
+     return outBamFile
+ 
+ 
+ # discard
+ def remap_2(ref_index, inBamFile, outBamFile, aligner, is_single, threadNum=1):
+-    print "remap start ......................................."
++    print("remap start .......................................")
+     if aligner == "bwa":
+         prefix = outBamFile.rstrip(".bam")
+         fastqPrefix = prefix + ".to"
+@@ -132,7 +132,7 @@ def remap_2(ref_index, inBamFile, outBamFile, aligner, is_single, threadNum=1):
+         samToBam(outSamFile, outBamFile_tmp)
+         bamSort(outBamFile_tmp, prefix)
+         bamIndex(outBamFile)
+-    print "remap end .........................................."
++    print("remap end ..........................................")
+     return outBamFile
+ 
+ 
+diff --git a/varben/common/methods.py b/varben/common/methods.py
+index 6378d82..d00a6ea 100644
+--- a/varben/common/methods.py
++++ b/varben/common/methods.py
+@@ -18,6 +18,7 @@ def count_coverage(bam, chr, start, end):
+ 
+ def calPolymorphism(bam, chrom, start, end):
+     reads = bam.fetch(chrom, start, end + 1)
++    print(chrom, start, end + 1)
+     numDict = {}
+     readsNum = 0
+     for pos in range(start, end):
+@@ -25,7 +26,8 @@ def calPolymorphism(bam, chrom, start, end):
+     for read in reads:
+         readsNum += 1
+         for pair in read.get_aligned_pairs():
+-            if start <= pair[1] < end:
++            # There may be no aligned pair
++            if pair[1] and start <= pair[1] < end:
+                 pos = pair[0]
+                 if pos is None:
+                     continue
+@@ -217,8 +219,8 @@ def reCalculateSequence(origFlowSignal, flowOrder, libKey, barcode):
+         i += 1
+         pos += 1
+ 
+-    print seq, len(libKey + barcode), len(libKey), len(barcode)
+-    print seq[len(libKey + barcode):]
++    print(seq, len(libKey + barcode), len(libKey), len(barcode))
++    print(seq[len(libKey + barcode):])
+ 
+ 
+ def deal_life_reads(read, flow_order, lib_key, barcode):
+@@ -235,7 +237,7 @@ def deal_life_reads(read, flow_order, lib_key, barcode):
+             orig_flow_signal = tag[1]
+             break
+     if not orig_flow_signal:
+-        print "Please make sure that it is a life read, since there is no tag ZM"
++        print("Please make sure that it is a life read, since there is no tag ZM")
+         return False
+ 
+     flow_signal_str, final_seq = reCalculateFlowSignal(read.query_sequence, orig_flow_signal, flow_order,
+diff --git a/varben/common/recordlog.py b/varben/common/recordlog.py
+index 8f3290c..9768c20 100644
+--- a/varben/common/recordlog.py
++++ b/varben/common/recordlog.py
+@@ -7,7 +7,7 @@ class InvalidLog(object):
+         self.log = open(log_file, 'w')
+ 
+     def info(self, *args):
+-        print args
++        print(args)
+         args_str = ", ".join(args) + "\n"
+         self.log.write(args_str)
+ 
+diff --git a/varben/deal_mut/checkMutInput.py b/varben/deal_mut/checkMutInput.py
+index 5a9be00..3b0cf1d 100644
+--- a/varben/deal_mut/checkMutInput.py
++++ b/varben/deal_mut/checkMutInput.py
+@@ -1,6 +1,7 @@
+ from varben.common.bamobject import Mutation, Haplotype
+ from varben.common.methods import calPolymorphism
+ import pysam
++import functools
+ 
+ 
+ def check_alt(alt):
+@@ -71,7 +72,7 @@ def check_polymorphism(bam, ref, mutinfo, maxsnpfrac):
+             else:
+                 snp_frac = 0
+             if snp_frac > maxsnpfrac:
+-                print snp_frac, maxsnpfrac
++                print(snp_frac, maxsnpfrac)
+                 return False
+     return True
+ 
+@@ -121,7 +122,7 @@ def bed_cmp(mut_a, mut_b):
+ 
+ def check_haplotype(bam, ref, mut_file, haplosize, snpfrac, invalid_log):
+     mut_list = check_mut_file(bam, ref, mut_file, snpfrac, invalid_log)
+-    mut_list.sort(cmp=bed_cmp)
++    mut_list.sort(key=functools.cmp_to_key(bed_cmp))
+     cur_chrom, cur_end = None, None
+     haplotype_list = []
+     hap_mut_list = []
+diff --git a/varben/deal_mut/dealHaplotype.py b/varben/deal_mut/dealHaplotype.py
+index e1c9efd..fe34e30 100644
+--- a/varben/deal_mut/dealHaplotype.py
++++ b/varben/deal_mut/dealHaplotype.py
+@@ -25,23 +25,23 @@ def deal_haplotype(bam_file, haplotype, reffasta, haplotype_prefix, mindepth, mi
+ 
+     # judge depth and mut reads whether qualified
+     if depth < int(mindepth):
+-        print "depth less than min depth!"
++        print("depth less than min depth!")
+         return False, "haplotype in position %s:%s-%s: depth less than min depth(%s)" % (
+             haplotype.chrom, haplotype.start, haplotype.end, mindepth)
+     else:
+         mut_reads_num = int(depth * haplotype.freq)
+         if mut_reads_num < int(minmutreads):
+-            print "mutation reads num less than minmutreads!"
++            print("mutation reads num less than minmutreads!")
+             return False, "haplotype in position %s:%s-%s: mut reads less than min mut reads(%s)" % (
+                 haplotype.chrom, haplotype.start, haplotype.end, minmutreads)
+ 
+-    print "start pick reads"
++    print("start pick reads")
+     # print str(haplotype)
+     res = pick_reads(bam, reads_dict, mut_reads_num, is_single, minmapq, is_multmapfilter)
+     if res[0] is False:
+         return False, "haplotype in position %s:%s-%s: %s" % (haplotype.chrom, haplotype.start, haplotype.end, res[1])
+     chosen_reads, mate_reads = res
+-    print "end pick reads"
++    print("end pick reads")
+     # edit
+     my_chosen_reads = {}
+     my_mate_reads = {}
+@@ -50,11 +50,11 @@ def deal_haplotype(bam_file, haplotype, reffasta, haplotype_prefix, mindepth, mi
+     chosen_reads_num = 0
+ 
+     real_mut_reads_num = 0
+-    for readName, readInfo in chosen_reads.items():
++    for readName, readInfo in list(chosen_reads.items()):
+         my_chosen_reads[readName] = {}
+         tmp_dict = {}
+         tmp_dict2 = {}
+-        for strand, read in readInfo.items():
++        for strand, read in list(readInfo.items()):
+             my_read = Read(read)
+             res = editRead(my_read, reffasta, haplotype.mutList)
+             if res is False:
+@@ -103,7 +103,7 @@ def deal_haplotype(bam_file, haplotype, reffasta, haplotype_prefix, mindepth, mi
+ def pick_reads(bam, reads_dict, choose_num, is_single, minmapq, is_multmapfilter):
+     total_reads_num = len(reads_dict)
+     chosen_reads = {}
+-    keys = reads_dict.keys()
++    keys = list(reads_dict.keys())
+     chosen_reads_id = []
+     try_reads_id = []
+     mate_reads = {}
+@@ -122,7 +122,7 @@ def pick_reads(bam, reads_dict, choose_num, is_single, minmapq, is_multmapfilter
+             try_reads_id.append(choose_id)
+ 
+             read_name = keys[choose_id]
+-            strand_keys = reads_dict[read_name].keys()
++            strand_keys = list(reads_dict[read_name].keys())
+             strand = strand_keys[0]
+             read = reads_dict[read_name][strand]
+             # print read.mapping_quality, len(read.query_sequence)
+@@ -148,7 +148,7 @@ def pick_reads(bam, reads_dict, choose_num, is_single, minmapq, is_multmapfilter
+ 
+             read_name = keys[choose_id]
+ 
+-            strand_keys = reads_dict[read_name].keys()
++            strand_keys = list(reads_dict[read_name].keys())
+             if len(reads_dict[read_name]) == 1:
+                 read = reads_dict[read_name][strand_keys[0]]
+                 if int(read.mapping_quality) < minmapq:
+@@ -163,7 +163,7 @@ def pick_reads(bam, reads_dict, choose_num, is_single, minmapq, is_multmapfilter
+                         if mate_read is not None:
+                             mate_reads[read_name] = mate_read
+                         else:
+-                            print "no mate read found!"
++                            print("no mate read found!")
+             if len(reads_dict[read_name]) == 2:
+                 read1 = reads_dict[read_name][strand_keys[0]]
+                 read2 = reads_dict[read_name][strand_keys[1]]
+diff --git a/varben/deal_mut/readEditor.py b/varben/deal_mut/readEditor.py
+index 23d3cb1..f5eb53e 100644
+--- a/varben/deal_mut/readEditor.py
++++ b/varben/deal_mut/readEditor.py
+@@ -7,7 +7,7 @@ def editRead(read, refFile, mutList):
+     seq = read.query_sequence
+     qual = read.query_qualities
+     if qual is None:
+-        print "Warning: " + str(read) + " quality is None. Continue!"
++        print("Warning: " + str(read) + " quality is None. Continue!")
+         return False
+     ref = pysam.FastaFile(refFile)
+     seq_len = len(seq)
+@@ -91,7 +91,7 @@ def editRead(read, refFile, mutList):
+ def snvEdit(read, pos):
+     posPairList = read.get_aligned_pairs
+     if pos < read.reference_start or pos > read.reference_end:
+-        print "Warning: SNV is out of this read!"
++        print("Warning: SNV is out of this read!")
+         return False
+ 
+     mutPosIndex = None
+@@ -100,7 +100,7 @@ def snvEdit(read, pos):
+             mutPosIndex = pair[0]
+             break
+     if mutPosIndex is None:
+-        print "Warning: A deletion existed of this read: %s at pos %s, can't spike in snv" % (read.query_name, pos)
++        print("Warning: A deletion existed of this read: %s at pos %s, can't spike in snv" % (read.query_name, pos))
+         return False
+     return mutPosIndex
+ 
+@@ -108,7 +108,7 @@ def snvEdit(read, pos):
+ def insEdit(read, pos):
+     posPairList = read.get_aligned_pairs
+     if pos + 1 < read.reference_start or pos > read.reference_end:
+-        print "Warning: ins is out of this read!"
++        print("Warning: ins is out of this read!")
+         return False
+     elif pos + 1 == read.reference_start:
+         mutPosIndex = -1
+@@ -118,7 +118,7 @@ def insEdit(read, pos):
+             if pair[1] == pos:
+                 mutPosIndex = pair[0]
+         if mutPosIndex is None:
+-            print "Warning: A deletion existed of this read: %s at pos %s, can't spike in ins" % (read.query_name, pos)
++            print("Warning: A deletion existed of this read: %s at pos %s, can't spike in ins" % (read.query_name, pos))
+             return False
+     return mutPosIndex
+ 
+@@ -127,7 +127,7 @@ def delEdit(read, start, end):
+     posPairList = read.get_aligned_pairs
+     if (start < read.reference_start and end < read.reference_start) or (
+             start > read.reference_end and end > read.reference_end):
+-        print "Warning: del is out of this read!"
++        print("Warning: del is out of this read!")
+         return False
+ 
+     elif start < read.reference_start <= end:
+@@ -138,6 +138,8 @@ def delEdit(read, start, end):
+ 
+     startPosIndex, endPosIndex = None, None
+     for pair in posPairList:
++        if not pair[1]:
++            break
+         if pair[1] <= start:
+             if pair[0] is not None:
+                 startPosIndex = pair[0]
+@@ -147,8 +149,8 @@ def delEdit(read, start, end):
+         if pair[1] > end:
+             break
+     if startPosIndex is None or endPosIndex is None:
+-        print "Warning: A deletion existed of this read: %s at pos %s-%s, can't spike in del" % (
+-        read.query_name, startPosIndex, endPosIndex)
++        print("Warning: A deletion existed of this read: %s at pos %s-%s, can't spike in del" % (
++        read.query_name, startPosIndex, endPosIndex))
+         return False
+ 
+     return (startPosIndex, endPosIndex)
+@@ -158,7 +160,7 @@ def subEdit(read, start, end):
+     posPairList = read.get_aligned_pairs
+     if (start < read.reference_start and end < read.reference_start) or (
+             start > read.reference_end and end > read.reference_end):
+-        print "Warning: sub is out of this read!"
++        print("Warning: sub is out of this read!")
+         return False
+ 
+     elif start < read.reference_start <= end:
+@@ -179,8 +181,8 @@ def subEdit(read, start, end):
+         if pair[1] > end:
+             break
+     if startPosIndex is None or endPosIndex is None:
+-        print "Warning: A deletion existed of this read: %s at pos %s-%s, can't spike in sub" % (
+-        read.query_name, startPosIndex, endPosIndex)
++        print("Warning: A deletion existed of this read: %s at pos %s-%s, can't spike in sub" % (
++        read.query_name, startPosIndex, endPosIndex))
+         return False
+     # print startPosIndex, endPosIndex
+     return (startPosIndex, endPosIndex)
+diff --git a/varben/deal_mut/readsReplace.py b/varben/deal_mut/readsReplace.py
+index 5689657..50291b6 100644
+--- a/varben/deal_mut/readsReplace.py
++++ b/varben/deal_mut/readsReplace.py
+@@ -41,8 +41,8 @@ def reads_replace(bam_file, total_chosen_reads, seqer, flow_order, lib_key, barc
+     # write edited reads into edit.bam
+     edit_bam_file = os.path.join(out_dir, "edit.bam")
+     edit_bam = pysam.AlignmentFile(edit_bam_file, 'wb', template=bam)
+-    for read_name, readInfo in edit_bam_reads.items():
+-        for strand, read in readInfo.items():
++    for read_name, readInfo in list(edit_bam_reads.items()):
++        for strand, read in list(readInfo.items()):
+             edit_bam.write(read)
+     edit_bam.close()
+ 
+diff --git a/varben/deal_sv/checkSVInput.py b/varben/deal_sv/checkSVInput.py
+index 469f40b..d7ef424 100644
+--- a/varben/deal_sv/checkSVInput.py
++++ b/varben/deal_sv/checkSVInput.py
+@@ -28,7 +28,7 @@ def check_sv(sv_info, chrom_len):
+             if end - start < min_size:
+                 raise Exception("deletion is not in correct format")
+         elif sv_type == "dup":
+-            print sv_info[dup_num_id]
++            print(sv_info[dup_num_id])
+             dup_num = int(sv_info[dup_num_id])
+             if end - start < min_size or not dup_num >= 1:
+                 raise Exception("duplication is not in correct format")
+@@ -67,8 +67,8 @@ def check_sv(sv_info, chrom_len):
+             sv.dup_num = int(sv_info[dup_num_id])
+         return True, sv
+     except Exception as e:
+-        print traceback.format_exc()
+-        print e.args
++        print(traceback.format_exc())
++        print(e.args)
+         return False, e.args
+ 
+ 
+@@ -87,7 +87,7 @@ def check_sv_file(sv_file, ref_file, invalid_log):
+             if line == "":
+                 break
+             sv_info = line.split()
+-            print sv_info
++            print(sv_info)
+             flag, res = check_sv(sv_info, chrom_len)
+             if not flag:
+                 invalid_log.info(line, res[0])
+diff --git a/varben/deal_sv/dealReadsType.py b/varben/deal_sv/dealReadsType.py
+index 5070243..a4eb4f6 100644
+--- a/varben/deal_sv/dealReadsType.py
++++ b/varben/deal_sv/dealReadsType.py
+@@ -218,7 +218,7 @@ def mend_read_part(ref, read, start, end, readsType, relPart, svtype="del",
+ 
+ def deal_type1(ref, reads_type1_left, reads_type1_right, freq, start, end, svtype, subPos=None):
+     # fix up
+-    print "deal type1 start......"
++    print("deal type1 start......")
+     reads_left_num = len(reads_type1_left)
+     reads_right_num = len(reads_type1_right)
+     reads_left_mend_id = random_mendIDList(reads_left_num, freq)
+@@ -243,12 +243,12 @@ def deal_type1(ref, reads_type1_left, reads_type1_right, freq, start, end, svtyp
+         read.query_sequence = new_seq
+         read.query_qualities = qual
+         total_reads.append([read, read_mate])
+-    print "deal type1 end......"
++    print("deal type1 end......")
+     return total_reads
+ 
+ 
+ def deal_type2(ref, reads_type2_left, reads_type2_right, freq, start, end, svtype, subPos=None):
+-    print "deal type2 start......"
++    print("deal type2 start......")
+     reads_left_num = len(reads_type2_left)
+     reads_right_num = len(reads_type2_right)
+     reads_left_mend_id = random_mendIDList(reads_left_num, freq)
+@@ -345,17 +345,17 @@ def deal_type2(ref, reads_type2_left, reads_type2_right, freq, start, end, svtyp
+             read.query_qualities = qual
+             read2 = read_pair[1]
+             total_reads.append([read, read2])
+-    print "deal type2 end......"
++    print("deal type2 end......")
+     return total_reads
+ 
+ 
+ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end, svtype, supple1=None, supple2=None,
+                subPos=None):
+     # choose left read of start and right of end
+-    print "deal type3 start......"
++    print("deal type3 start......")
+     reads_left_num = len(reads_type3_left)
+     reads_right_num = len(reads_type3_right)
+-    print reads_left_num, reads_right_num
++    print(reads_left_num, reads_right_num)
+     reads_left_mend_id = random_mendIDList(reads_left_num, freq)
+     reads_right_mend_id = random_mendIDList(reads_right_num, freq)
+     total_del_reads = []
+@@ -363,7 +363,7 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+     total_modify_reads = []
+     if svtype == "del":
+         if len(supple1) == 0:
+-            print "Step3: Warning! No corresponding reads to pair"
++            print("Step3: Warning! No corresponding reads to pair")
+             return [], [], []
+         for read_pair_id in reads_left_mend_id:
+             read_pair = reads_type3_left[read_pair_id]
+@@ -382,16 +382,16 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                         [read.reference_name, str(read.reference_start), str(read.reference_end), str(read.is_read1)])
+                     y = "\t".join([new_read.reference_name, str(new_read.reference_start), str(new_read.reference_end),
+                                    str(new_read.is_read1)])
+-                    print(x + "; " + y)
++                    print((x + "; " + y))
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+ 
+     if svtype == "dup":
+         if len(supple1) == 0:
+-            print "Step3: Warning! No corresponding reads to pair"
++            print("Step3: Warning! No corresponding reads to pair")
+             return [], [], []
+         for read_pair_id in reads_left_mend_id:
+             read_pair = reads_type3_left[read_pair_id]
+@@ -411,7 +411,7 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+ 
+     elif svtype == "inv":
+@@ -420,7 +420,7 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+         #    return [], [], []
+         # print 'inv', len(reads_left_mend_id)
+         if len(reads_type3_left) == 0 or len(reads_type3_right) == 0:
+-            print "Step3: Warning! No corresponding reads to pair"
++            print("Step3: Warning! No corresponding reads to pair")
+             return [], [], []
+         for read_pair_id in reads_left_mend_id:
+             read_pair = reads_type3_left[read_pair_id]
+@@ -447,11 +447,11 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                         [read.reference_name, str(read.reference_start), str(read.reference_end), str(read.is_read1)])
+                     y = "\t".join([new_read.reference_name, str(new_read.reference_start), str(new_read.reference_end),
+                                    str(new_read.is_read1)])
+-                    print(x + "; " + y)
++                    print((x + "; " + y))
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+ 
+         for read_pair_id in reads_right_mend_id:
+@@ -477,7 +477,7 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+ 
+     elif svtype == "trans_balance":
+@@ -485,7 +485,7 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+         res = re.match("(\w*):(\d*)-(\d*)", subPos)
+         trans_chr, trans_start, trans_end = res.group(1), int(res.group(2)), int(res.group(3))
+         if len(reads_left_sub) == 0 or len(reads_right_sub) == 0:
+-            print "Step3: Warning! No corresponding reads to pair"
++            print("Step3: Warning! No corresponding reads to pair")
+             return [], [], []
+         for read_pair_id in reads_left_mend_id:
+             read_pair = reads_type3_left[read_pair_id]
+@@ -502,7 +502,7 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+ 
+         for read_pair_id in reads_right_mend_id:
+@@ -520,14 +520,14 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+     elif svtype == "trans_chrom":
+         reads_left_sub, reads_right_sub = supple1, supple2
+         res = re.match("(\w*):(\d*)-(\d*)", subPos)
+         trans_chr, trans_start, trans_end = res.group(1), int(res.group(2)), int(res.group(3))
+         if len(reads_left_sub) == 0:
+-            print "Step3: Warning! No corresponding reads to pair"
++            print("Step3: Warning! No corresponding reads to pair")
+             return [], [], []
+         for read_pair_id in reads_left_mend_id:
+             read_pair = reads_type3_left[read_pair_id]
+@@ -545,18 +545,18 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                         [read.reference_name, str(read.reference_start), str(read.reference_end), str(read.is_read1)])
+                     y = "\t".join([new_read.reference_name, str(new_read.reference_start), str(new_read.reference_end),
+                                    str(new_read.is_read1)])
+-                    print(x + "; " + y)
++                    print((x + "; " + y))
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+     elif svtype == "trans_unbalance":
+         reads_left_sub, reads_right_sub = supple1, supple2
+         res = re.match("(\w*):(\d*)-(\d*)", subPos)
+         trans_chr, trans_start, trans_end = res.group(1), int(res.group(2)), int(res.group(3))
+         if len(reads_left_sub) == 0 or len(reads_right_sub) == 0:
+-            print "Step3: Warning! No corresponding reads to pair"
++            print("Step3: Warning! No corresponding reads to pair")
+             return [], [], []
+         for read_pair_id in reads_left_mend_id:
+             read_pair = reads_type3_left[read_pair_id]
+@@ -574,7 +574,7 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+ 
+         for read_pair_id in reads_right_mend_id:  # use left again, because right is none
+@@ -592,14 +592,14 @@ def deal_type3(reads_type3_left, reads_type3_right, freq, insertSize, start, end
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+-    print "deal type3 end......"
++    print("deal type3 end......")
+     return total_modify_reads, total_add_reads, total_del_reads
+ 
+ 
+ def deal_type4(reads_type4, freq, svtype, insertSize=None, cnvType=None):
+-    print "deal type4 start......"
++    print("deal type4 start......")
+     reads_num = len(reads_type4)
+     reads_mend_id = random_mendIDList(reads_num, freq)
+     total_reads = []
+@@ -615,7 +615,7 @@ def deal_type4(reads_type4, freq, svtype, insertSize=None, cnvType=None):
+ 
+     elif svtype == "dup" or (svtype == "cnv" and cnvType == "gain") or svtype == "trans_unbalance":
+         reads_mend_left_id = random_mendIDList(reads_num / 2, freq)
+-        print "left mend count", len(reads_mend_left_id)
++        print("left mend count", len(reads_mend_left_id))
+         for read_pair_id in reads_mend_left_id:
+             # print read_pair_id
+             read_pair = reads_type4[read_pair_id]
+@@ -634,12 +634,12 @@ def deal_type4(reads_type4, freq, svtype, insertSize=None, cnvType=None):
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+                     # print "out loop1"
+ 
+         reads_mend_right_id = [reads_num / 2 + i for i in random_mendIDList(reads_num - reads_num / 2, freq)]
+-        print "right mend count", len(reads_mend_right_id)
++        print("right mend count", len(reads_mend_right_id))
+         for read_pair_id in reads_mend_right_id:
+             # print read_pair_id
+             read_pair = reads_type4[read_pair_id]
+@@ -657,15 +657,15 @@ def deal_type4(reads_type4, freq, svtype, insertSize=None, cnvType=None):
+                     break
+                 try_time += 1
+                 if try_time > try_max_time:
+-                    print "can't find a mate read to match!"
++                    print("can't find a mate read to match!")
+                     break
+-    print "deal type4 end......"
++    print("deal type4 end......")
+     return total_reads
+ 
+ 
+ def deal_type5(ref, reads_type5_left, reads_type5_right, freq, start, end, svtype, supple1=None, supple2=None,
+                subPos=None):
+-    print "deal type5 start......"
++    print("deal type5 start......")
+     reads_left_num = len(reads_type5_left)
+     reads_right_num = len(reads_type5_right)
+ 
+@@ -729,7 +729,7 @@ def deal_type5(ref, reads_type5_left, reads_type5_right, freq, start, end, svtyp
+             read_right.query_qualities = qual_right
+             total_reads.append([read_left, read_right])
+ 
+-    print "deal type5 end......"
++    print("deal type5 end......")
+ 
+     return total_reads
+ 
+@@ -738,20 +738,20 @@ def random_mendIDList(totalReadsNum, frac):
+     if totalReadsNum == 0:
+         return []
+     if frac <= 1:
+-        mendList = random.sample(range(totalReadsNum), int(totalReadsNum * frac))
++        mendList = random.sample(list(range(totalReadsNum)), int(totalReadsNum * frac))
+         return mendList
+     elif frac > 1:
+         cnt = int(frac)
+         frac_sub = frac / (cnt + 1)
+         total_mendList = []
+         for i in range(cnt + 1):
+-            mendList = random.sample(range(totalReadsNum), int(totalReadsNum * frac_sub))
++            mendList = random.sample(list(range(totalReadsNum)), int(totalReadsNum * frac_sub))
+             total_mendList.extend(mendList)
+         return total_mendList
+ 
+ 
+ def deal_type6(ref, reads_type1_left, reads_type1_right, freq, start, end, svtype, subPos=None):
+-    print "deal type6 start......"
++    print("deal type6 start......")
+     reads_left_num = len(reads_type1_left)
+     reads_right_num = len(reads_type1_right)
+     reads_left_mend_id = random_mendIDList(reads_left_num, freq)
+@@ -797,12 +797,12 @@ def deal_type6(ref, reads_type1_left, reads_type1_right, freq, start, end, svtyp
+             read.query_sequence = new_seq
+             read.query_qualities = qual
+         total_reads.append([read])
+-    print "deal type6 end......"
++    print("deal type6 end......")
+     return total_reads
+ 
+ 
+ def deal_type7(reads_type4, freq, svtype):
+-    print "deal type7 start......"
++    print("deal type7 start......")
+     reads_num = len(reads_type4)
+     reads_mend_id = random_mendIDList(reads_num, freq)
+     total_reads = []
+diff --git a/varben/deal_sv/dealSVType.py b/varben/deal_sv/dealSVType.py
+index 99c2417..977c258 100644
+--- a/varben/deal_sv/dealSVType.py
++++ b/varben/deal_sv/dealSVType.py
+@@ -11,8 +11,8 @@ def record_reads(bam_file, out_dir, label, reads_type1_left, reads_type1_right,
+                  reads_type3_left, reads_type3_right, reads_type4, reads_type5_left, reads_type5_right):
+     loc = locals()
+     # bam = pysam.AlignmentFile(bam_file, 'rb')
+-    print label
+-    for key, value in loc.items():
++    print(label)
++    for key, value in list(loc.items()):
+         if key in ('bam_file', 'label', 'out_dir'):
+             continue
+         reads = value
+@@ -75,7 +75,7 @@ def deal_sv(bam_file, ref_file, sv_list, is_single, minmapq, is_multmapfilter, m
+             start_coverage_deal = start_coverage * freq
+             end_coverage = count_coverage(bam, chrom, end, end)
+             end_coverage_deal = end_coverage
+-            print start_coverage, end_coverage, mindepth
++            print(start_coverage, end_coverage, mindepth)
+             # exit()
+             if start_coverage < mindepth or end_coverage < mindepth:
+                 invalid_log.info(str(sv_info), "coverage too small")
+@@ -261,7 +261,7 @@ def deal_duplication(bam, ref, svinfo, is_single, readLength, tempDir, insertSiz
+         if type_reads_num == 0:
+             return False, "All reads is filtered in this scope, total & filtered reads num %s" % filtered_read_num
+         freq = freq * (type_reads_num * 2 + filtered_read_num) / (type_reads_num * 2)
+-        print freq
++        print(freq)
+         if freq > 1:
+             freq = 1
+         freq_dup = (dup_num - 1) * freq
+diff --git a/varben/deal_sv/getReadsType.py b/varben/deal_sv/getReadsType.py
+index 60bd2d6..0584916 100644
+--- a/varben/deal_sv/getReadsType.py
++++ b/varben/deal_sv/getReadsType.py
+@@ -99,7 +99,7 @@ def posType_sub_single(bamFile, chr, sub_start, sub_end, start, end, minmapq, is
+     total_reads = []
+     for read in reads:
+         total_reads.append(read)
+-    print len(total_reads)
++    print(len(total_reads))
+     reads_type6_left = []  # 6. in left place of del and read is on the breakpoint
+     reads_type6_right = []  # 6. in right place of del and read is on the breakpoint
+     reads_type7 = []  # 7. reads within the del
+@@ -131,7 +131,7 @@ def posType_sub_single(bamFile, chr, sub_start, sub_end, start, end, minmapq, is
+ def posType_sub_paired(bamFile, chr, sub_start, sub_end, start, end, readLength, minmapq, is_multmapfilter,
+                        extension=None):
+     bam = pysam.AlignmentFile(bamFile, 'rb')
+-    print sub_start, sub_end
++    print(sub_start, sub_end)
+     reads = bam.fetch(chr, sub_start, sub_end)
+ 
+     total_reads = []
+@@ -147,7 +147,7 @@ def posType_sub_paired(bamFile, chr, sub_start, sub_end, start, end, readLength,
+     reads_type5_left = []  # 5. in left place of del and first read and right read are all has intersection
+     reads_type5_right = []  # 3. in right place of del and first read and right read are all has intersection
+     filtered_reads_num = 0
+-    print "Sub reads num: ", len(total_reads)
++    print("Sub reads num: ", len(total_reads))
+     reverse_num = 0
+     for read in total_reads:
+         mate_read = find_mate(read, bam)
+@@ -198,14 +198,14 @@ def posType_sub_paired(bamFile, chr, sub_start, sub_end, start, end, readLength,
+                 reads_type5_right.append([read_left, read_right])
+         elif position == "center":
+             reads_type4.append([read_left, read_right])
+-    print "Reverse num: ", reverse_num
++    print("Reverse num: ", reverse_num)
+     bam.close()
+     return reads_type1_left, reads_type1_right, reads_type2_left, reads_type2_right, reads_type3_left, reads_type3_right, reads_type4, reads_type5_left, reads_type5_right, filtered_reads_num
+ 
+ 
+ def pos_type_classify(bamfile, chrom, start, end, is_single, read_length, temp_dir, extension=None, center=True,
+                       maxsize=None, process=20, minmapq=0, is_multmapfilter=False):
+-    print bamfile, chrom, start, end, is_single, read_length, temp_dir, extension, center
++    print(bamfile, chrom, start, end, is_single, read_length, temp_dir, extension, center)
+     if is_single:
+         total_reads_type6_left = []  # 6. in left place of del and second read is on the breakpoint
+         total_reads_type6_right = []  # 6. in right place of del and first read is on the breakpoint
+@@ -253,7 +253,7 @@ def pos_type_classify(bamfile, chrom, start, end, is_single, read_length, temp_d
+         total_reads_type6_right.extend(reads_type6_right)
+         total_reads_type7.extend(reads_type7)
+         total_filtered_reads = filtered_reads_num
+-        print total_reads_type6_left, total_reads_type6_right, total_reads_type7, total_filtered_reads
++        print(total_reads_type6_left, total_reads_type6_right, total_reads_type7, total_filtered_reads)
+         return total_reads_type6_left, total_reads_type6_right, total_reads_type7, total_filtered_reads
+     else:
+         total_reads_type1_left = []  # 1. in left place of del and second read is on the breakpoint
+@@ -274,7 +274,7 @@ def pos_type_classify(bamfile, chrom, start, end, is_single, read_length, temp_d
+         if start == end:
+             rel_start = start - maxsize
+             rel_end = end + maxsize
+-            print rel_start, rel_end
++            print(rel_start, rel_end)
+             # temp_prefix = "%s/classify_%s" % (temp_dir, "whole")
+             (reads_type1_left, reads_type1_right, reads_type2_left, reads_type2_right, reads_type3_left,
+              reads_type3_right, reads_type4, reads_type5_left, reads_type5_right, filtered_reads_num) \
+@@ -330,7 +330,7 @@ def pos_type_classify(bamfile, chrom, start, end, is_single, read_length, temp_d
+                         sub_end = rel_end
+                     else:
+                         sub_end = sub_start + 1
+-                    print "Sub Process: %s" % i, sub_start, sub_end
++                    print("Sub Process: %s" % i, sub_start, sub_end)
+                     result_list.append(
+                         run_pool.apply_async(posType_sub_paired, args=(
+                             bamfile, chrom, sub_start, sub_end, start, end, read_length, minmapq, is_multmapfilter,
+@@ -353,7 +353,7 @@ def pos_type_classify(bamfile, chrom, start, end, is_single, read_length, temp_d
+                         sub_end = rel_end_left
+                     else:
+                         sub_end = sub_start + 1
+-                    print "Sub Process: %s" % i, sub_start, sub_end
++                    print("Sub Process: %s" % i, sub_start, sub_end)
+                     # temp_prefix = "%s/classify_%s" % (temp_dir, i)
+                     result_list.append(
+                         run_pool.apply_async(posType_sub_paired, args=(
+@@ -368,7 +368,7 @@ def pos_type_classify(bamfile, chrom, start, end, is_single, read_length, temp_d
+                         sub_end = rel_end_right
+                     else:
+                         sub_end = sub_start + 1
+-                    print "Sub Process: %s" % i, sub_start, sub_end
++                    print("Sub Process: %s" % i, sub_start, sub_end)
+                     # temp_prefix = "%s/classify_%s" % (temp_dir, i)
+                     result_list.append(
+                         run_pool.apply_async(posType_sub_paired, args=(
+@@ -391,10 +391,10 @@ def pos_type_classify(bamfile, chrom, start, end, is_single, read_length, temp_d
+                 total_reads_type5_right.extend(reads_type5_right)
+                 total_filtered_reads += filtered_reads_num
+ 
+-        print "type1_left: %s; type1_right: %s, type2_left: %s; type2_right: %s, type3_left: %s; " \
++        print("type1_left: %s; type1_right: %s, type2_left: %s; type2_right: %s, type3_left: %s; " \
+               "type3_right: %s, type4: %s; type5_left: %s; type5_right: %s" % (
+                   len(total_reads_type1_left), len(total_reads_type1_right), len(total_reads_type2_left),
+                   len(total_reads_type2_right), len(total_reads_type3_left), len(total_reads_type3_right),
+-                  len(total_reads_type4), len(total_reads_type5_left), len(total_reads_type5_right))
+-        print "total_filtered_reads: %s" % total_filtered_reads
++                  len(total_reads_type4), len(total_reads_type5_left), len(total_reads_type5_right)))
++        print("total_filtered_reads: %s" % total_filtered_reads)
+         return total_reads_type1_left, total_reads_type1_right, total_reads_type2_left, total_reads_type2_right, total_reads_type3_left, total_reads_type3_right, total_reads_type4, total_reads_type5_left, total_reads_type5_right, total_filtered_reads
+diff --git a/varben/deal_sv/mergeEditBam.py b/varben/deal_sv/mergeEditBam.py
+index 52d7d3a..d0cb027 100644
+--- a/varben/deal_sv/mergeEditBam.py
++++ b/varben/deal_sv/mergeEditBam.py
+@@ -113,7 +113,7 @@ def merge_edit_bam(bam_file, out_dir, is_single, total_modify_reads_file, total_
+                 orig_read2 = used_reads[read2_name]
+                 new_read1 = copy.deepcopy(orig_read1)
+                 new_read2 = copy.deepcopy(orig_read2)
+-                print read1_name
++                print(read1_name)
+                 new_read1.query_sequence = modify_reads_seq[read1_name]
+                 new_read1.query_qualities = modify_reads_quan[read1_name]
+                 new_read2.query_sequence = modify_reads_seq[read2_name]
+diff --git a/varben/deal_sv/writeBamByChr.py b/varben/deal_sv/writeBamByChr.py
+index 03ca0ec..16bef9d 100644
+--- a/varben/deal_sv/writeBamByChr.py
++++ b/varben/deal_sv/writeBamByChr.py
+@@ -21,7 +21,7 @@ def get_name_list(reads_file, chr):
+ 
+ def write_bam_byChr(bamFile, chr, excludeBamFile, editBamFile, total_modify_reads_file, total_delete_reads_file,
+                     total_add_reads_file):
+-    print chr
++    print(chr)
+     bam = pysam.AlignmentFile(bamFile, 'rb')
+     excludeBam = pysam.AlignmentFile(excludeBamFile, 'wb', template=bam)
+     editBam = pysam.AlignmentFile(editBamFile, 'wb', template=bam)
+@@ -44,7 +44,7 @@ def write_bam_byChr(bamFile, chr, excludeBamFile, editBamFile, total_modify_read
+         else:
+             excludeBam.write(read)
+     delete.close()
+-    print "Total reads: ", m
++    print("Total reads: ", m)
+     bam.close()
+     excludeBam.close()
+     editBam.close()
