@@ -4,6 +4,7 @@ let
   # Bcftools needs perl
   runtimeInputs  = with pkgs; [
     bwa
+    coreutils
     bcftools
     bedtools
     samtools
