@@ -1,12 +1,13 @@
-{ pkgs, stdenv, fetchFromGitHub, coreutils, boost, zlib, lib, makeWrapper }:
+{ pkgs, stdenv, fetchFromGitHub, lib, makeWrapper }:
 
 let
   # Bcftools needs perl
   runtimeInputs  = with pkgs; [
     bwa
-    coreutils
     bcftools
     bedtools
+    coreutils
+    gnugrep
     samtools
   ];
   my-python-packages = p: with p; [
