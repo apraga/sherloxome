@@ -13,6 +13,7 @@
         in {
             packages.${system} = {
                 varben = pkgs.callPackage pkgs/varben.nix {};
+                simuscop = pkgs.callPackage pkgs/simuscop.nix {};
             };
         };
 }
