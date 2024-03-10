@@ -6,10 +6,12 @@ It also needs capture kits in `baid2020/bed`
 
 Usage : 
 
+    cd scripts/compare
     cargo run -p compare -- -d VCFDIRECTORY -o OUTDIRECTORY
 
 Ex: 
 
+    cd scripts/compare
     cargo run -p compare -- -d ../../../bisonex/out/preprocessing/markduplicates/ -o bisonex-giab
 
 Example of a slurm file (needs `cargo build --release` to be run beforehand)

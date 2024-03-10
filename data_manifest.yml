@@ -248,7 +248,7 @@ files:
   tracked: false
   md5: ec61d76ad725d808e3a9e1c8acec402a
   size: 125932193
-  url: https://ftp-trace.ncbi.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/latest/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/latest/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
 - path: baid2020/grch38/vcf/novaseq/wes_idt/50x/HG004.novaseq.wes-idt.50x.gatk4.grch38.vcf.gz
   tracked: false
   md5: bf2129fc3ab1c0c4c6240975a49acd3b
@@ -1748,7 +1748,7 @@ files:
   tracked: false
   md5: e1ea90c830f981d29a46043eb618e7bf
   size: 15479939
-  url: https://ftp-trace.ncbi.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/latest/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark.bed
+  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/latest/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark.bed
 - path: baid2020/grch38/vcf/novaseq/wes_idt/75x/HG006.novaseq.wes-idt.75x.strelka2.grch38.vcf.gz
   tracked: false
   md5: 65bca0ba54f1a16417b6e9f1d84cd65c
