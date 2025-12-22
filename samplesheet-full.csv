@@ -1,2 +1,2 @@
 patient,sample,lane,fastq_1,fastq_2
-HG001,hiseq4000-agilent-50x,1,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG001.hiseq4000.wes_agilent.50x.R1.fastq.gz,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG001.hiseq4000.wes_agilent.50x.R2.fastq.gz
+HG001,HG001-hiseq4000-agilent-50x,1,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG001.hiseq4000.wes_agilent.50x.R1.fastq.gz,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG001.hiseq4000.wes_agilent.50x.R2.fastq.gz
