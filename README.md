@@ -1,1 +1,11 @@
-See documentation in https://apraga.github.io/exomevalidator.
+## Requirements
+
+- hap.py
+- vcfeval
+- a genome (do a symlink ?)
+
+Download truth files with
+
+```bash
+make truth
+```
