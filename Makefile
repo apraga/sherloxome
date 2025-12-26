@@ -31,4 +31,4 @@ ref/HG007_%:
 	wget -P ref https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG007_NA24695_mother/latest/GRCh38/HG007_$*
 
 run:
-	nextflow run nf-core/sarek --input samplesheet.csv  -r 3.5.1 --outdir giab --tools haplotypecaller -bg
+	nextflow run nf-core/sarek --input samplesheet.csv  -r 3.5.1 --outdir giab --tools haplotypecaller -c conf/slurm.config -bg

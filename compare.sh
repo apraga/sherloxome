@@ -12,7 +12,7 @@ fail() {
 # Compute the capture filename from the VCF full path
 capture_bed() {
     if [[ $1 =~ agilent ]]; then
-        echo "./capture/Agilent_SureSelect_All_Exons_v8_hg38_Regions.bed"
+        echo "./capture/Agilent_SureSelect_All_Exons_v7_hg38_Regions.bed"
     else
         fail "No capture found in VCF filename $1"
     fi
@@ -70,6 +70,7 @@ happy() {
 
 # happy lol.vcf hg002-out
 fasta=/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full_analysis_set.fna
-vcf=./hg002/variant_calling/haplotypecaller/HG002-hiseq4000-agilent-50x/HG002-hiseq4000-agilent-50x.haplotypecaller.vcf.gz
+vcf=giab/variant_calling/haplotypecaller/HG002-hiseq4000-agilent-50x/HG002-hiseq4000-agilent-50x.haplotypecaller.vcf.gz
 # vcf=./HG002.hiseq4000.wes-agilent.50x.gatk4.grch38.vcf.gz
-happy $vcf $fasta hg002-out
+mkdir -p analysis
+happy $vcf $fasta analysis/hg002-test
