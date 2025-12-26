@@ -6,8 +6,6 @@ HG005 = HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz HG005_GRCh38_1_22_v4.2.1_bench
 HG006 = HG006_GRCh38_1_22_v4.2.1_benchmark.vcf.gz HG006_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi HG006_GRCh38_1_22_v4.2.1_benchmark.bed
 HG007 = HG007_GRCh38_1_22_v4.2.1_benchmark.vcf.gz HG007_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi HG007_GRCh38_1_22_v4.2.1_benchmark.bed
 
-
-
 GIAB = ${HG001} ${HG002} ${HG003} ${HG004} ${HG005} ${HG006} ${HG007}
 
 # Store into suddirectory ref
@@ -32,3 +30,5 @@ ref/HG006_%:
 ref/HG007_%:
 	wget -P ref https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG007_NA24695_mother/latest/GRCh38/HG007_$*
 
+run:
+	nextflow run nf-core/sarek --input samplesheet.csv  -r 3.5.1 --outdir giab --tools haplotypecaller -bg

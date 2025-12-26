@@ -20,8 +20,9 @@ capture_bed() {
 
 # Compute the patient from the VCF full path
 patient_from_vcf() {
+    vcf=$(basename $1)
     for n in $(seq 1 7); do
-        if [[ $1 =~ "HG00$n" ]]; then
+        if [[ $vcf =~ "HG00$n" ]]; then
             echo "HG00$n"
             exit 0
         fi
@@ -56,6 +57,7 @@ truth_bed() {
 # Other parameters are deduced from the filename
 happy() {
     patient=$(patient_from_vcf $1) || exit
+    echo "Patient: $patient"
     truth_vcf=$(truth_vcf $patient) || exit
     truth_bed=$(truth_bed $patient) || exit
     capture_bed=$(capture_bed $1) || exit
@@ -69,4 +71,5 @@ happy() {
 # happy lol.vcf hg002-out
 fasta=/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full_analysis_set.fna
 vcf=./hg002/variant_calling/haplotypecaller/HG002-hiseq4000-agilent-50x/HG002-hiseq4000-agilent-50x.haplotypecaller.vcf.gz
+# vcf=./HG002.hiseq4000.wes-agilent.50x.gatk4.grch38.vcf.gz
 happy $vcf $fasta hg002-out
