@@ -11,13 +11,17 @@ Files
 rtg format /Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full_analysis_set.fna  -o  sdf
 ```
 -  Download truth files with `make truth`
-```
 
 ## Run
 
-With sarek
+Select the combination patient/capture kit/sequecer from the full samplesheet. A run can accomodate several fastq but only for a single capture kit.
+For example, select all HG001 data for Agilent and run sarek with
 
-nextflow run nf-core/sarek --input samplesheet-full.csv  -r 3.5.1 --outdir hg002 --tools haplotypecaller
+```bash
+head -n 1 samplesheet-full.csv  > samplesheet.csv
+grep agilent samplesheet-full.csv | grep 'HG001' >> samplesheet.csv
+make run-agilent
+```
 
 ## Capture kits
 
