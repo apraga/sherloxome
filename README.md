@@ -31,5 +31,7 @@ Baid 2020 : "Agilent v7, IDT-xGen, and Nextera"
 
 ## Analysis
 
-`bash compare.sh` will run hap.py over all vcf genereted by sarek in `giab` (path is harcoded). By default, parallel uses 4 cores, 1 for each hap.py.
+`make compare` will run  `compare.sh`, which will run hap.py over all vcf genereted by sarek in `giab` (path is harcoded). By default, parallel uses 4 cores, 1 for each hap.py.
 All output files will be is the `analysis` folder.
+
+`make merge` concanate and reformat the summarized output of all happy comparisons into `analysis/all-giab.csv`

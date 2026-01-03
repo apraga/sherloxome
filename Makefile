@@ -34,3 +34,9 @@ run-agilent:
 	nextflow run nf-core/sarek --input samplesheet.csv  -r 3.5.1 --outdir giab -c conf/slurm.config \
 	--tools haplotypecaller --skip_tools haplotypecaller_filter	 \
 	--wes --intervals ./capture/Agilent_SureSelect_All_Exons_v7_hg38_Regions.bed -bg
+
+compare:
+	bash compare.sh
+
+merge:
+	find analysis -name \*.summary.csv -execdir awk -f ../merge.awk {} \; > analysis/all-giab.csv
