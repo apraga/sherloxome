@@ -39,4 +39,4 @@ compare:
 	bash compare.sh
 
 merge:
-	find analysis -name \*.summary.csv -execdir awk -f ../merge.awk {} \; > analysis/all-giab.csv
+	awk -f merge.awk analysis/*.summary.csv > analysis/all-giab.csv
