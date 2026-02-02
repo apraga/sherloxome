@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use sherloxome::giab::Patient;
 use std::path::PathBuf;
 use toml;
 
@@ -8,15 +9,6 @@ use serde::Deserialize;
 struct Config {
     real: Option<RealConfig>,
     silico: Option<SilicoConfig>,
-}
-
-#[derive(Deserialize, Debug)]
-enum Patient {
-    HG001,
-    HG002,
-    HG003,
-    HG004,
-    HG005,
 }
 
 #[derive(Deserialize, Debug)]
