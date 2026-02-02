@@ -6,6 +6,8 @@
 //!
 use crate::giab::Patient;
 use serde::Deserialize;
+use std::fs::File;
+use std::io::Write;
 use std::{collections::HashSet, fmt};
 
 /// A run is defined by a [Patient], [Sequencer], capture [Kit] and [Depth]
@@ -552,7 +554,37 @@ pub fn available() -> HashSet<Run> {
     HashSet::from(combinations)
 }
 
-pub fn samplesheet(p: &Patient, s: &Sequencer, k: &Kit, d: &Depth) {
-    let sample = format!("{:?}-{:}-{:}-{:?}", p, s, k, d);
+pub fn write_samplesheet(runs: HashSet<Run>) {
+    let mut file = File::create("samplesheet.csv").unwrap();
+    file.write(b"patient,sample,lane,fastq_1,fastq_2\n")
+        .unwrap();
+    for run in runs {
+        samplesheet_row(run, &mut file);
+    }
+}
+
+pub fn samplesheet_row(run: Run, file: &mut File) {
+    let sample = format!(
+        "{:}-{:}-{:}-{:}",
+        run.patient, run.sequencer, run.kit, run.depth
+    );
     println!("{:?}", sample);
+    let fastq1 = url(run, "R1");
+    let fastq2 = url(run, "R2");
+
+    let row = format!("{},{sample},1,{fastq1},{fastq2}\n", run.patient);
+    file.write(row.as_bytes()).unwrap();
+}
+
+/// Use google cloud URL. Nextflow will download the data
+pub fn url(run: Run, lane: &str) -> String {
+    let root = format!(
+        "https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/{sequencer}/wes_{kit}/{depth}/{patient}.{sequencer}.wes_{kit}.{depth}",
+        kit = run.kit,
+        sequencer = run.sequencer,
+        patient = run.patient,
+        depth = run.depth,
+    );
+
+    format!("{}.{}.fastq.gz", root, lane)
 }

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use itertools::iproduct;
-use sherloxome::fastqbaid2020::{Depth, Kit, Run, Sequencer, available, samplesheet};
+use sherloxome::fastqbaid2020::{Depth, Kit, Run, Sequencer, available, write_samplesheet};
 use sherloxome::giab::Patient;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -56,7 +56,7 @@ fn candidate_runs(real: &RealConfig) -> HashSet<Run> {
         .collect::<HashSet<Run>>()
 }
 
-fn filter_available_runs(real: &RealConfig) {
+fn filter_available_runs(real: &RealConfig) -> HashSet<Run> {
     let runs_candidates = candidate_runs(&real);
 
     println!(
@@ -74,6 +74,7 @@ fn filter_available_runs(real: &RealConfig) {
         .cloned()
         .collect();
     println!("Only {:} are available", runs.len());
+    runs
 }
 
 fn main() {
@@ -82,7 +83,8 @@ fn main() {
     let config: Config = toml::from_str(&content).unwrap();
 
     if let Some(real) = config.real {
-        filter_available_runs(&real);
+        let runs = filter_available_runs(&real);
+        write_samplesheet(runs);
     } else {
         println!("No real patients...");
     }
