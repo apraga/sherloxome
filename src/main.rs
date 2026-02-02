@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand};
+use itertools::iproduct;
+use sherloxome::fastqbaid2020::{Depth, Kit, Run, Sequencer, available, samplesheet};
 use sherloxome::giab::Patient;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use toml;
 
@@ -19,7 +22,11 @@ struct SilicoConfig {
 #[derive(Deserialize, Debug)]
 struct RealConfig {
     patients: Vec<Patient>,
+    sequencers: Vec<Sequencer>,
+    kits: Vec<Kit>,
+    depths: Vec<Depth>,
 }
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -37,16 +44,45 @@ enum Commands {
     Samplesheet {},
 }
 
+/// Do the cartesian product of the runs select by the user
+fn candidate_runs(real: &RealConfig) -> HashSet<Run> {
+    iproduct!(&real.patients, &real.sequencers, &real.kits, &real.depths)
+        .map(|(p, s, k, d)| Run {
+            patient: *p,
+            sequencer: *s,
+            kit: *k,
+            depth: *d,
+        })
+        .collect::<HashSet<Run>>()
+}
+
+fn filter_available_runs(real: &RealConfig) {
+    let runs_candidates = candidate_runs(&real);
+
+    println!(
+        "You asked for {} runs ({:?} patients x {} kits x {} depths x {} sequencers)",
+        runs_candidates.len(),
+        real.patients.len(),
+        real.kits.len(),
+        real.depths.len(),
+        real.sequencers.len(),
+    );
+    let runs_available = available();
+    // Filter only available runs
+    let runs: HashSet<Run> = runs_candidates
+        .intersection(&runs_available)
+        .cloned()
+        .collect();
+    println!("Only {:} are available", runs.len());
+}
+
 fn main() {
     let cli = Cli::parse();
-
-    println!("Value for config: {}", cli.config.display());
-
     let content = std::fs::read_to_string(cli.config).unwrap();
     let config: Config = toml::from_str(&content).unwrap();
-    println!("{:?}", config);
+
     if let Some(real) = config.real {
-        println!("Real patients: {:?}", real.patients);
+        filter_available_runs(&real);
     } else {
         println!("No real patients...");
     }
@@ -56,12 +92,6 @@ fn main() {
     } else {
         println!("No silico patients...");
     }
-    // if let Some(config_path) = cli.config.as_deref() {
-    // println!("Value for config: {}", config_path.display());
-    // }
-
-    // You can check for the existence of subcommands, and if found use their
-    // matches just as you would the top level cmd
     match &cli.command {
         Some(Commands::Samplesheet {}) => {}
         None => {}

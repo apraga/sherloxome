@@ -4,8 +4,9 @@
 //! For raw data, [see here](crate::fastqbaid2020)
 use serde::Deserialize;
 
-/// Patient ID
-#[derive(Deserialize, Debug)]
+/// Patient ID according to GIAB
+/// Equality is required to compare runs [see here](crate::fastqbaid2020)
+#[derive(Clone, Copy, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub enum Patient {
     HG001,
     HG002,

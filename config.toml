@@ -1,5 +1,8 @@
 [real]
 patients = ["HG001"]
+depths = ["50x", "75x"]
+kits = ["agilent"]
+sequencers = ["hiseq4000"]
 
 [silico]
 patients = ["HG001"]
