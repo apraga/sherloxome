@@ -2,6 +2,7 @@ use crate::fastqbaid2020::{Depth, Kit, Run, Sequencer};
 use crate::fastqbaid2020::{available, samplesheet_real};
 use crate::giab::Patient;
 use clap::{Parser, Subcommand};
+use glob::glob;
 use itertools::iproduct;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -11,7 +12,7 @@ use serde::Deserialize;
 
 /// Configuration file for the user definig which GIAB data and which in silico data
 #[derive(Deserialize, Debug)]
-pub struct Config {
+struct Config {
     real: Option<RealConfig>,
     silico: Option<SilicoConfig>,
 }
@@ -32,10 +33,6 @@ struct RealConfig {
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Sets a custom config file (TOML)
-    #[arg(short, long, value_name = "FILE")]
-    config: PathBuf,
-
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -43,7 +40,19 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Generate samplesheet for all use cases
-    Samplesheet {},
+    Samplesheet {
+        /// Sets a custom config file (TOML)
+        #[arg(short, long, value_name = "FILE")]
+        config: PathBuf,
+    },
+    /// Analyse VCF with hap.py
+    Analyse {
+        #[arg(short, long, value_name = "INPUT_DIR")]
+        input: PathBuf,
+
+        #[arg(short, long, value_name = "OUTPUT_DIR")]
+        output: PathBuf,
+    },
 }
 
 /// Do the cartesian product of the runs select by the user
@@ -96,15 +105,32 @@ fn generate_samplesheet(config: &Config) {
     }
 }
 
+/// Analyse all VCF in a directory.
+///
+/// Match them to a reference patients, call happy on each VCF and its
+/// reference and merge the results.
+fn analyse(input_dir: PathBuf, output_dir: PathBuf) {
+    // Convert directory to string, not easy
+    let pattern = format!("{}/**/*.vcf.gz", input_dir.display().to_string());
+    println!("{:?}", pattern);
+    for vcf in glob(pattern.as_str()).unwrap() {
+        if let Ok(path) = vcf {
+            println!("{:?}", path.display())
+        }
+    }
+}
+
 /// Read CLI arguments and call relevant functions
 pub fn process_cli() {
     let cli = Cli::parse();
-    let content = std::fs::read_to_string(cli.config).unwrap();
-
-    let config: Config = toml::from_str(&content).unwrap();
     match &cli.command {
-        Some(Commands::Samplesheet {}) => {
-            generate_samplesheet(&config);
+        Some(Commands::Samplesheet { config }) => {
+            let content = std::fs::read_to_string(config).unwrap();
+            let c: Config = toml::from_str(&content).unwrap();
+            generate_samplesheet(&c);
+        }
+        Some(Commands::Analyse { input, output }) => {
+            analyse(input.to_path_buf(), output.to_path_buf());
         }
         None => {}
     }
