@@ -554,7 +554,7 @@ pub fn available() -> HashSet<Run> {
     HashSet::from(combinations)
 }
 
-pub fn write_samplesheet(runs: HashSet<Run>) {
+pub fn samplesheet_real(runs: HashSet<Run>) {
     let mut file = File::create("samplesheet.csv").unwrap();
     file.write(b"patient,sample,lane,fastq_1,fastq_2\n")
         .unwrap();
