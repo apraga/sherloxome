@@ -1,15 +1,17 @@
 use clap::Parser;
 use flate2::read::GzDecoder;
 use glob::glob;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::fs;
 use std::io;
-use std::path::{Path,PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use rayon::iter::{ParallelIterator, IntoParallelIterator};
-
 
 fn query_bed(path: &Path) -> PathBuf {
-    let path_str = path.to_str().expect("Path is not valid UTF-8").to_lowercase();
+    let path_str = path
+        .to_str()
+        .expect("Path is not valid UTF-8")
+        .to_lowercase();
     let capt_base = PathBuf::from("../../baid2020/bed");
 
     let capt_file = if path_str.contains("idt") {
@@ -20,13 +22,12 @@ fn query_bed(path: &Path) -> PathBuf {
         "agilent.targets.grch38.bed"
     };
 
-     capt_base.join(capt_file)
+    capt_base.join(capt_file)
 }
 
-
 fn truth_base() -> PathBuf {
-   PathBuf::from("../../giab")
-} 
+    PathBuf::from("../../giab")
+}
 
 fn truth_vcf(patient: &str) -> PathBuf {
     let vcf = PathBuf::from(format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"));
@@ -40,14 +41,23 @@ fn truth_bed(patient: &str) -> PathBuf {
 
 fn patient(vcf: &PathBuf) -> String {
     let vcf_ = vcf.to_str().expect("Fails to convert VCF to UTF8");
-    if vcf_.contains("HG001") { String::from("HG001")}
-    else if vcf_.contains("HG002") { String::from("HG002")}
-    else if vcf_.contains("HG003") { String::from("HG003")}
-    else if vcf_.contains("HG004") { String::from("HG004")}
-    else if vcf_.contains("HG005") { String::from("HG005")}
-    else if vcf_.contains("HG006") { String::from("HG006")}
-    else if vcf_.contains("HG007") { String::from("HG007")}
-    else { panic!("No patient found")}
+    if vcf_.contains("HG001") {
+        String::from("HG001")
+    } else if vcf_.contains("HG002") {
+        String::from("HG002")
+    } else if vcf_.contains("HG003") {
+        String::from("HG003")
+    } else if vcf_.contains("HG004") {
+        String::from("HG004")
+    } else if vcf_.contains("HG005") {
+        String::from("HG005")
+    } else if vcf_.contains("HG006") {
+        String::from("HG006")
+    } else if vcf_.contains("HG007") {
+        String::from("HG007")
+    } else {
+        panic!("No patient found")
+    }
 }
 
 fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
@@ -60,8 +70,7 @@ fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
             .arg(&sdf)
             .status()
             .expect("Failed to execute command");
-    }
-    else {
+    } else {
         println!("{} already exists", sdf.display())
     }
     sdf
@@ -77,23 +86,38 @@ fn filename(vcf: &PathBuf) -> Option<String> {
 // Run happy with vcfeval (see for example the nix package)
 // We parallelize over the number of VCF. rtg is run as single thread for now.
 // Warning : --threads must be set, otherwise the default value on some cluster may cause it to fail.
-fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, query_bed: &PathBuf, 
-                    outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
+fn happy_vcfeval(
+    truth_vcf: &PathBuf,
+    truth_bed: &PathBuf,
+    query_vcf: &PathBuf,
+    query_bed: &PathBuf,
+    outdir: &PathBuf,
+    fasta: &PathBuf,
+    sdf: &PathBuf,
+) {
     let prefix = filename(query_vcf).unwrap();
     let out = outdir.join(prefix);
     if out.join(".summary.csv").exists() {
         println!("Summary file already exists (summary)");
     } else {
         println!("Processing {:?}", query_vcf);
-        let args = [truth_vcf.to_str().unwrap(), 
-                    query_vcf.to_str().unwrap(), 
-                    "--false-positives", truth_bed.to_str().unwrap(), 
-                    "--target-regions", query_bed.to_str().unwrap(), 
-                    "--reference", fasta.to_str().unwrap(),
-                    "--engine=vcfeval",
-                    "--engine-vcfeval-template", sdf.to_str().unwrap(),
-                    "--threads", "1", // Must be set
-                    "-o", out.to_str().unwrap()];
+        let args = [
+            truth_vcf.to_str().unwrap(),
+            query_vcf.to_str().unwrap(),
+            "--false-positives",
+            truth_bed.to_str().unwrap(),
+            "--target-regions",
+            query_bed.to_str().unwrap(),
+            "--reference",
+            fasta.to_str().unwrap(),
+            "--engine=vcfeval",
+            "--engine-vcfeval-template",
+            sdf.to_str().unwrap(),
+            "--threads",
+            "1", // Must be set
+            "-o",
+            out.to_str().unwrap(),
+        ];
         let output = Command::new("hap.py")
             .args(&args)
             .output()
@@ -101,8 +125,7 @@ fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, 
         if !output.status.success() {
             println!("Happy fails to execute:");
             println!("{:?}", String::from_utf8(output.stderr))
-        }
-        else {
+        } else {
             println!("{:?}", String::from_utf8(output.stdout))
         }
     }
@@ -111,21 +134,16 @@ fn happy_vcfeval(truth_vcf: &PathBuf, truth_bed: &PathBuf, query_vcf: &PathBuf, 
 fn extract_fasta(fasta_gz: &PathBuf) -> PathBuf {
     let fasta = fasta_gz.with_extension("");
     if !fasta.exists() {
-        let gz_file = fs::File::open(fasta_gz)
-            .expect("Fails to read gzip fasta");
+        let gz_file = fs::File::open(fasta_gz).expect("Fails to read gzip fasta");
         let mut gz_decoder = GzDecoder::new(gz_file);
-        let mut file = fs::File::create(fasta.clone())
-            .expect("Fails to create fasta");
-        io::copy(&mut gz_decoder, &mut file)
-            .expect("failed to extract fasta");
+        let mut file = fs::File::create(fasta.clone()).expect("Fails to create fasta");
+        io::copy(&mut gz_decoder, &mut file).expect("failed to extract fasta");
         println!("Extracted {}", fasta.display());
-    }
-    else {
+    } else {
         println!("Already extracted {}", fasta.display());
     }
     fasta
 }
-
 
 fn compare(indir: &str, outdir: &PathBuf) {
     let genome = PathBuf::from("../../genome/GCA_000001405.15_GRCh38_full_analysis_set.fna.gz");
@@ -134,10 +152,10 @@ fn compare(indir: &str, outdir: &PathBuf) {
     let sdf = fasta_to_sdf(&fasta);
 
     let expr = format!("{}/**/HG*.vcf.gz", indir);
-    let files: Vec<_> = glob(&expr).expect("Fails to find vcf").collect(); 
+    let files: Vec<_> = glob(&expr).expect("Fails to find vcf").collect();
     assert!(!files.is_empty(), "Found no files matching {}", expr);
 
-    files.into_par_iter().for_each(|x|  {
+    files.into_par_iter().for_each(|x| {
         compare_vcf(&x.unwrap(), &outdir, &fasta, &sdf);
     });
 }
@@ -145,12 +163,26 @@ fn compare(indir: &str, outdir: &PathBuf) {
 fn compare_vcf(entry: &PathBuf, outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
     let patient = patient(&entry);
     let vcf_truth = truth_vcf(&patient);
-    assert!(vcf_truth.exists(), "Missing truth vcf {}", vcf_truth.display());
+    assert!(
+        vcf_truth.exists(),
+        "Missing truth vcf {}",
+        vcf_truth.display()
+    );
     let bed_truth = truth_bed(&patient);
-    assert!(bed_truth.exists(), "Missing truth bed {}", bed_truth.display());
+    assert!(
+        bed_truth.exists(),
+        "Missing truth bed {}",
+        bed_truth.display()
+    );
     let bed_query = query_bed(&entry);
-    assert!(bed_query.exists(), "Missing query bed {}", bed_query.display());
-    happy_vcfeval(&vcf_truth, &bed_truth, &entry, &bed_query, &outdir, &fasta, &sdf);
+    assert!(
+        bed_query.exists(),
+        "Missing query bed {}",
+        bed_query.display()
+    );
+    happy_vcfeval(
+        &vcf_truth, &bed_truth, &entry, &bed_query, &outdir, &fasta, &sdf,
+    );
 }
 
 #[derive(Parser, Debug)]
@@ -164,7 +196,6 @@ struct Args {
     #[arg(short, long)]
     out: String,
 }
-
 
 fn main() {
     let args = Args::parse();

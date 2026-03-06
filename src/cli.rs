@@ -34,6 +34,10 @@ struct RealConfig {
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
+    /// Sets a custom config file (TOML)
+    #[arg(short, long, value_name = "FILE")]
+    config: PathBuf,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -41,13 +45,9 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Generate samplesheet for all use cases
-    Samplesheet {
-        /// Sets a custom config file (TOML)
-        #[arg(short, long, value_name = "FILE")]
-        config: PathBuf,
-    },
-    /// Analyse VCF with hap.py
-    Analyse {
+    Samplesheet {},
+    /// Analyze VCF with hap.py
+    Analyze {
         #[arg(short, long, value_name = "INPUT_DIR")]
         input: PathBuf,
 
@@ -110,11 +110,11 @@ fn generate_samplesheet(config: &Config) {
     }
 }
 
-/// Analyse all VCF in a directory.
+/// Analyze all VCF in a directory.
 ///
 /// Match them to a reference patients, call happy on each VCF and its
 /// reference and merge the results.
-fn analyse(input_dir: PathBuf, output_dir: PathBuf) {
+fn analyse(conf: &Config, input_dir: PathBuf, output_dir: PathBuf) {
     // Convert directory to string, not easy
     let pattern = format!("{}/**/*.vcf.gz", input_dir.display().to_string());
     println!("{:?}", pattern);
@@ -164,14 +164,15 @@ fn download(out_dir: PathBuf) {
 /// Read CLI arguments and call relevant functions
 pub fn process_cli() {
     let cli = Cli::parse();
+    let content = std::fs::read_to_string(cli.config).unwrap();
+    let conf: Config = toml::from_str(&content).unwrap();
+
     match &cli.command {
-        Some(Commands::Samplesheet { config }) => {
-            let content = std::fs::read_to_string(config).unwrap();
-            let c: Config = toml::from_str(&content).unwrap();
-            generate_samplesheet(&c);
+        Some(Commands::Samplesheet {}) => {
+            generate_samplesheet(&conf);
         }
-        Some(Commands::Analyse { input, output }) => {
-            analyse(input.to_path_buf(), output.to_path_buf());
+        Some(Commands::Analyze { input, output }) => {
+            analyse(&conf, input.to_path_buf(), output.to_path_buf());
         }
 
         Some(Commands::Download { output }) => {

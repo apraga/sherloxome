@@ -1,8 +1,15 @@
+# Configuration for "real" GIAIB patients that haven't bee modified in silico
 [real]
 patients = ["HG001", "HG002", "HG003", "HG004", "HG005", "HG006", "HG007"]
 depths = ["50x", "75x", "100x"]
-kits = ["agilent", "idt", "truseq"]
+capture = ["agilent"] #, "idt", "truseq"]
 sequencers = ["hiseq4000", "novaseq"]
 
 [silico]
 patients = ["HG001"]
+
+# Define here the name of the capture (used in the filename) and the bed file
+[capture]
+idt = "idt_capture.grch38.bed"
+truseq = "truseq-dna-exome-targeted-regions-manifest-v1-2-hg38.bed"
+agilent = "agilent.targets.grch38.bed"
