@@ -1,6 +1,7 @@
 use crate::fastqbaid2020::{Depth, Kit, Run, Sequencer};
 use crate::fastqbaid2020::{available, samplesheet_real};
-use crate::giab::Patient;
+use crate::giab::{Patient, bed_url, vcf_url};
+use crate::giab::{bed_file, vcf_file};
 use clap::{Parser, Subcommand};
 use glob::glob;
 use itertools::iproduct;
@@ -51,6 +52,10 @@ enum Commands {
         input: PathBuf,
 
         #[arg(short, long, value_name = "OUTPUT_DIR")]
+        output: PathBuf,
+    },
+    Download {
+        #[arg(short, long, value_name = "OUTPUT_DIR", default_value = "data/ref")]
         output: PathBuf,
     },
 }
@@ -120,6 +125,42 @@ fn analyse(input_dir: PathBuf, output_dir: PathBuf) {
     }
 }
 
+/// Helper to download a single URL. Assume the output directory exist
+fn download_blocking(url: &str, out: &PathBuf) {
+    if out.exists() {
+        println!("{:?} already exists, skipping", out);
+    } else {
+        let resp = reqwest::blocking::get(url)
+            .expect("Failed to download")
+            .bytes()
+            .expect("Invalid body in download");
+        std::fs::write(out, resp).expect("Failed to write dowloaded file");
+    }
+}
+
+/// Download all reference VCF and BED in a directory.
+fn download(out_dir: PathBuf) {
+    let patients = [
+        Patient::HG001,
+        Patient::HG002,
+        Patient::HG003,
+        Patient::HG004,
+        Patient::HG005,
+        Patient::HG006,
+        Patient::HG007,
+    ];
+    std::fs::create_dir_all(&out_dir).expect("Could not create directory");
+    for p in patients {
+        println!("{:?}", p);
+        let mut vcf = out_dir.clone().join(vcf_file(&p));
+        let bed = out_dir.clone().join(bed_file(&p));
+        download_blocking(&vcf_url(&p), &vcf);
+        vcf.set_extension("gz.tbi");
+        download_blocking(&vcf_url(&p), &vcf);
+        download_blocking(&bed_url(&p), &bed);
+    }
+}
+
 /// Read CLI arguments and call relevant functions
 pub fn process_cli() {
     let cli = Cli::parse();
@@ -132,8 +173,10 @@ pub fn process_cli() {
         Some(Commands::Analyse { input, output }) => {
             analyse(input.to_path_buf(), output.to_path_buf());
         }
+
+        Some(Commands::Download { output }) => {
+            download(output.to_path_buf());
+        }
         None => {}
     }
-
-    // Continued program logic goes here...
 }
