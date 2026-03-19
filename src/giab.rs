@@ -4,6 +4,7 @@
 //! For raw data, [see here](crate::fastqbaid2020)
 use serde::Deserialize;
 use std::fmt;
+use std::path::PathBuf;
 
 /// Patient ID according to GIAB
 /// Equality is required to compare runs [see here](crate::fastqbaid2020)
@@ -71,4 +72,25 @@ pub fn bed_file(p: &Patient) -> String {
 /// GIAB full URL on their FTP
 pub fn bed_url(p: &Patient) -> String {
     format!("{BASE_URL}/{}/{}", url_tail(p), bed_file(p))
+}
+
+pub fn patient_from_filename(fname: &PathBuf) -> Option<Patient> {
+    let name = fname.to_string_lossy();
+    all_patients()
+        .into_iter()
+        .find(|p| name.contains(&p.to_string()))
+}
+
+/// All GIAB patients
+pub fn all_patients() -> Vec<Patient> {
+    [
+        Patient::HG001,
+        Patient::HG002,
+        Patient::HG003,
+        Patient::HG004,
+        Patient::HG005,
+        Patient::HG006,
+        Patient::HG007,
+    ]
+    .to_vec()
 }

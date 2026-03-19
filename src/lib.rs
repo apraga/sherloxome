@@ -1,3 +1,18 @@
+pub mod analyze;
 pub mod cli;
 pub mod fastqbaid2020;
 pub mod giab;
+use std::path::PathBuf;
+
+/// Helper to download a single URL. Assume the output directory exist
+fn download_blocking(url: &str, out: &PathBuf) {
+    if out.exists() {
+        println!("{:?} already exists, skipping", out);
+    } else {
+        let resp = reqwest::blocking::get(url)
+            .expect("Failed to download")
+            .bytes()
+            .expect("Invalid body in download");
+        std::fs::write(out, resp).expect("Failed to write dowloaded file");
+    }
+}

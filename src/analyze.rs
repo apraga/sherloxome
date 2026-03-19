@@ -1,71 +1,96 @@
-use clap::Parser;
-use flate2::read::GzDecoder;
+use crate::fastqbaid2020::{Run, run_from_filename};
+use crate::giab;
+use std::collections::HashMap;
+// use flate2::read::GzDecoder;
 use glob::glob;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::error::Error;
+use std::fs::create_dir_all;
+use std::path::PathBuf;
 use std::process::Command;
 
-fn query_bed(path: &Path) -> PathBuf {
-    let path_str = path
-        .to_str()
-        .expect("Path is not valid UTF-8")
-        .to_lowercase();
-    let capt_base = PathBuf::from("../../baid2020/bed");
+///! Analyze all VCF in a directory with happy by comparing to reference VCF
 
-    let capt_file = if path_str.contains("idt") {
-        "idt_capture.grch38.bed"
-    } else if path_str.contains("truseq") {
-        "truseq-dna-exome-targeted-regions-manifest-v1-2-hg38.bed"
-    } else {
-        "agilent.targets.grch38.bed"
-    };
-
-    capt_base.join(capt_file)
+/// From a directory, list all VCFs matching runs information, call happy on each VCF
+/// merge the results.
+/// If there's an error in a VCF analysis, print a message and skip to the next
+pub fn analyze(
+    fasta: &PathBuf,
+    capture: HashMap<String, String>,
+    input_dir: PathBuf,
+    output_dir: PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    let sdf = fasta_to_sdf(fasta);
+    create_dir_all(&output_dir)?;
+    vcf_to_analyze(input_dir)
+        .into_par_iter()
+        .filter_map(|(query_vcf, run)| {
+            prepare_analysis(&run, &query_vcf, &capture).map(|(query_bed, truth_vcf, truth_bed)| {
+                (query_vcf, run, query_bed, truth_vcf, truth_bed)
+            })
+        })
+        .for_each(|(query_vcf, run, query_bed, truth_vcf, truth_bed)| {
+            happy_vcfeval(
+                &truth_vcf,
+                &truth_bed,
+                &query_vcf,
+                &query_bed,
+                &output_dir,
+                fasta,
+                &sdf,
+                run,
+            );
+        });
+    Ok(())
 }
 
-fn truth_base() -> PathBuf {
-    PathBuf::from("../../giab")
+/// Prepare files for happy : construct the filepath and check it exists
+fn prepare_analysis(
+    run: &Run,
+    query_vcf: &PathBuf,
+    capture: &HashMap<String, String>,
+) -> Option<(PathBuf, PathBuf, PathBuf)> {
+    let query_bed_ = capture.get(&run.capture.to_string()).or_else(|| {
+        eprintln!("No BED file for capture {:?}", run.capture);
+        None
+    })?;
+    let query_bed = PathBuf::from(query_bed_);
+    let truth_vcf = PathBuf::from("data/ref").join(giab::vcf_file(&run.patient));
+    let truth_bed = PathBuf::from("data/ref").join(giab::bed_file(&run.patient));
+    if let Some(missing) = [&query_bed, &query_vcf, &truth_vcf, &truth_bed]
+        .iter()
+        .find(|p| !p.exists())
+    {
+        eprintln!("Missing {:?}, skipping analysis", missing);
+        return None;
+    }
+    Some((query_bed, truth_vcf, truth_bed))
 }
 
-fn truth_vcf(patient: &str) -> PathBuf {
-    let vcf = PathBuf::from(format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"));
-    truth_base().join(vcf)
-}
-
-fn truth_bed(patient: &str) -> PathBuf {
-    let bed = PathBuf::from(format!("{patient}_GRCh38_1_22_v4.2.1_benchmark.bed"));
-    truth_base().join(bed)
-}
-
-fn patient(vcf: &PathBuf) -> String {
-    let vcf_ = vcf.to_str().expect("Fails to convert VCF to UTF8");
-    if vcf_.contains("HG001") {
-        String::from("HG001")
-    } else if vcf_.contains("HG002") {
-        String::from("HG002")
-    } else if vcf_.contains("HG003") {
-        String::from("HG003")
-    } else if vcf_.contains("HG004") {
-        String::from("HG004")
-    } else if vcf_.contains("HG005") {
-        String::from("HG005")
-    } else if vcf_.contains("HG006") {
-        String::from("HG006")
-    } else if vcf_.contains("HG007") {
-        String::from("HG007")
-    } else {
-        panic!("No patient found")
+/// From a directory, list all VCFs where the filename has run information
+/// i.e patient, capture, sequencer, depth. The last 2 parameters are not mandatory per se as GIAB reference
+/// don't have it but it's useful for statistical analysis later on.
+fn vcf_to_analyze(input_dir: PathBuf) -> Vec<(PathBuf, Run)> {
+    let pattern = format!("{}/**/*.vcf.gz", input_dir.display());
+    match glob(pattern.as_str()) {
+        Err(e) => {
+            eprintln!("Invalid glob pattern: {}", e);
+            vec![]
+        }
+        Ok(paths) => paths
+            .flatten()
+            .filter_map(|path| run_from_filename(&path).map(|run| (path, run)))
+            .collect(),
     }
 }
 
-fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
-    let sdf = genome.with_extension("sdf");
+/// Generate a sdf file from FASTA for happy. SDF file will be stored in the same directory as the FASTA
+fn fasta_to_sdf(fasta: &PathBuf) -> PathBuf {
+    let sdf = fasta.with_extension("sdf");
     if !sdf.exists() {
         Command::new("rtg")
             .arg("format")
-            .arg(genome)
+            .arg(fasta)
             .arg("-o")
             .arg(&sdf)
             .status()
@@ -76,13 +101,6 @@ fn fasta_to_sdf(genome: &PathBuf) -> PathBuf {
     sdf
 }
 
-// Manage double extensions like .tar.gz
-fn filename(vcf: &PathBuf) -> Option<String> {
-    let stem = vcf.file_stem()?.to_owned();
-    let double_stem = PathBuf::from(stem).file_stem()?.to_str()?.to_owned();
-    Some(double_stem)
-}
-
 // Run happy with vcfeval (see for example the nix package)
 // We parallelize over the number of VCF. rtg is run as single thread for now.
 // Warning : --threads must be set, otherwise the default value on some cluster may cause it to fail.
@@ -91,17 +109,24 @@ fn happy_vcfeval(
     truth_bed: &PathBuf,
     query_vcf: &PathBuf,
     query_bed: &PathBuf,
-    outdir: &PathBuf,
+    output_dir: &PathBuf,
     fasta: &PathBuf,
     sdf: &PathBuf,
+    run: Run,
 ) {
-    let prefix = filename(query_vcf).unwrap();
-    let out = outdir.join(prefix);
+    let prefix = format!(
+        "{}-{}-{}-{}",
+        run.patient, run.capture, run.sequencer, run.depth
+    );
+    let out = output_dir.join(prefix);
     if out.join(".summary.csv").exists() {
         println!("Summary file already exists (summary)");
-    } else {
-        println!("Processing {:?}", query_vcf);
-        let args = [
+        return;
+    }
+
+    println!("Processing {:?}", query_vcf);
+    let status = Command::new("hap.py")
+        .args([
             truth_vcf.to_str().unwrap(),
             query_vcf.to_str().unwrap(),
             "--false-positives",
@@ -114,94 +139,16 @@ fn happy_vcfeval(
             "--engine-vcfeval-template",
             sdf.to_str().unwrap(),
             "--threads",
-            "1", // Must be set
+            "1",
+            // "--sample",
+            // &run.patient.to_string(),
             "-o",
             out.to_str().unwrap(),
-        ];
-        let output = Command::new("hap.py")
-            .args(&args)
-            .output()
-            .expect("Failed to run hap.py from rust");
-        if !output.status.success() {
-            println!("Happy fails to execute:");
-            println!("{:?}", String::from_utf8(output.stderr))
-        } else {
-            println!("{:?}", String::from_utf8(output.stdout))
-        }
+        ])
+        .status()
+        .expect("Failed to run hap.py");
+
+    if !status.success() {
+        eprintln!("hap.py failed for {:?}", query_vcf);
     }
-}
-
-fn extract_fasta(fasta_gz: &PathBuf) -> PathBuf {
-    let fasta = fasta_gz.with_extension("");
-    if !fasta.exists() {
-        let gz_file = fs::File::open(fasta_gz).expect("Fails to read gzip fasta");
-        let mut gz_decoder = GzDecoder::new(gz_file);
-        let mut file = fs::File::create(fasta.clone()).expect("Fails to create fasta");
-        io::copy(&mut gz_decoder, &mut file).expect("failed to extract fasta");
-        println!("Extracted {}", fasta.display());
-    } else {
-        println!("Already extracted {}", fasta.display());
-    }
-    fasta
-}
-
-fn compare(indir: &str, outdir: &PathBuf) {
-    let genome = PathBuf::from("../../genome/GCA_000001405.15_GRCh38_full_analysis_set.fna.gz");
-    assert!(genome.exists(), "Missing genome {}", genome.display());
-    let fasta = extract_fasta(&genome);
-    let sdf = fasta_to_sdf(&fasta);
-
-    let expr = format!("{}/**/HG*.vcf.gz", indir);
-    let files: Vec<_> = glob(&expr).expect("Fails to find vcf").collect();
-    assert!(!files.is_empty(), "Found no files matching {}", expr);
-
-    files.into_par_iter().for_each(|x| {
-        compare_vcf(&x.unwrap(), &outdir, &fasta, &sdf);
-    });
-}
-
-fn compare_vcf(entry: &PathBuf, outdir: &PathBuf, fasta: &PathBuf, sdf: &PathBuf) {
-    let patient = patient(&entry);
-    let vcf_truth = truth_vcf(&patient);
-    assert!(
-        vcf_truth.exists(),
-        "Missing truth vcf {}",
-        vcf_truth.display()
-    );
-    let bed_truth = truth_bed(&patient);
-    assert!(
-        bed_truth.exists(),
-        "Missing truth bed {}",
-        bed_truth.display()
-    );
-    let bed_query = query_bed(&entry);
-    assert!(
-        bed_query.exists(),
-        "Missing query bed {}",
-        bed_query.display()
-    );
-    happy_vcfeval(
-        &vcf_truth, &bed_truth, &entry, &bed_query, &outdir, &fasta, &sdf,
-    );
-}
-
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    /// Directory searched for vcf files (recursive)
-    #[arg(short, long)]
-    dir: String,
-
-    /// Output directory
-    #[arg(short, long)]
-    out: String,
-}
-
-fn main() {
-    let args = Args::parse();
-
-    let outdir = PathBuf::from(&args.out);
-    fs::create_dir_all(&outdir).expect("Failed to create output dir");
-
-    compare(&args.dir, &outdir);
 }
