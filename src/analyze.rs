@@ -1,9 +1,10 @@
 use crate::fastqbaid2020::{Run, run_from_filename};
 use crate::giab;
-use std::collections::HashMap;
-// use flate2::read::GzDecoder;
 use glob::glob;
+use polars::lazy::prelude::*;
+use polars::prelude::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::create_dir_all;
 use std::path::PathBuf;
@@ -20,8 +21,22 @@ pub fn analyze(
     input_dir: PathBuf,
     output_dir: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    let sdf = fasta_to_sdf(fasta);
     create_dir_all(&output_dir)?;
+    analyze_happy(fasta, capture, input_dir, &output_dir)?;
+    merge_summaries(output_dir)?;
+    Ok(())
+}
+
+/// Analyse all output VCF in a directory with happy
+/// Run information are extracted from the filename, so it should contains the string
+/// representation of patients, runs, sequencer, catpure and depth
+pub fn analyze_happy(
+    fasta: &PathBuf,
+    capture: HashMap<String, String>,
+    input_dir: PathBuf,
+    output_dir: &PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    let sdf = fasta_to_sdf(fasta);
     vcf_to_analyze(input_dir)
         .into_par_iter()
         .filter_map(|(query_vcf, run)| {
@@ -41,6 +56,38 @@ pub fn analyze(
                 run,
             );
         });
+    Ok(())
+}
+
+/// Merge all summaries from happy found in output_dir.
+/// Run information are extracted from the filename, so it should contains the string
+/// representation of patients, runs, sequencer, catpure and depth
+fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
+    let pattern = format!("{}/*.summary.csv", output_dir.display());
+
+    let dfs: Vec<LazyFrame> = glob(&pattern)?
+        .flatten()
+        .map(|path| -> Result<LazyFrame, Box<dyn Error>> {
+            let sample = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or("Invalid filename")?
+                .to_string();
+
+            Ok(
+                LazyCsvReader::new(path.to_str().ok_or("Invalid summary path")?.into())
+                    .with_has_header(true)
+                    .finish()?
+                    .with_column(lit(sample).alias("sample")),
+            )
+        })
+        .collect::<Result<_, _>>()?;
+
+    let mut merged = concat(dfs, UnionArgs::default())?.collect()?;
+    let out_file = output_dir.join("merged.csv");
+    let mut file = std::fs::File::create(out_file.clone())?;
+    CsvWriter::new(&mut file).finish(&mut merged)?;
+    println!("Merged results in {:?}", out_file);
     Ok(())
 }
 
@@ -119,7 +166,7 @@ fn happy_vcfeval(
         run.patient, run.capture, run.sequencer, run.depth
     );
     let out = output_dir.join(prefix);
-    if out.join(".summary.csv").exists() {
+    if out.with_extension("summary.csv").exists() {
         println!("Summary file already exists (summary)");
         return;
     }
