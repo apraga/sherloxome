@@ -68,17 +68,16 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
     let dfs: Vec<LazyFrame> = glob(&pattern)?
         .flatten()
         .map(|path| -> Result<LazyFrame, Box<dyn Error>> {
-            let sample = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .ok_or("Invalid filename")?
-                .to_string();
-
+            let run =
+                run_from_filename(&path).ok_or("Failed to extract run from summary filename")?;
             Ok(
                 LazyCsvReader::new(path.to_str().ok_or("Invalid summary path")?.into())
                     .with_has_header(true)
                     .finish()?
-                    .with_column(lit(sample).alias("sample")),
+                    .with_column(lit(run.patient.to_string()).alias("patient"))
+                    .with_column(lit(run.capture.to_string()).alias("capture"))
+                    .with_column(lit(run.sequencer.to_string()).alias("sequencer"))
+                    .with_column(lit(run.depth.to_string()).alias("depth")),
             )
         })
         .collect::<Result<_, _>>()?;
