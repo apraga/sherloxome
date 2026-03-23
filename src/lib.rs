@@ -2,6 +2,7 @@ pub mod analyze;
 pub mod cli;
 pub mod fastqbaid2020;
 pub mod giab;
+pub mod plot;
 use std::path::PathBuf;
 
 /// Helper to download a single URL. Assume the output directory exist

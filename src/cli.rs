@@ -4,6 +4,7 @@ use crate::fastqbaid2020::{Capture, Depth, Run, Sequencer};
 use crate::fastqbaid2020::{available, samplesheet_real};
 use crate::giab::{Patient, bed_url, vcf_url};
 use crate::giab::{all_patients, bed_file, vcf_file};
+use crate::plot::plot;
 use clap::{Parser, Subcommand};
 use itertools::iproduct;
 use std::collections::{HashMap, HashSet};
@@ -63,6 +64,13 @@ enum Commands {
     },
     Download {
         #[arg(short, long, value_name = "OUTPUT_DIR", default_value = "data/ref")]
+        output: PathBuf,
+    },
+
+    Plot {
+        #[arg(short, long, value_name = "INPUT_FILE")]
+        input: PathBuf,
+        #[arg(short, long, value_name = "OUTPUT_FILE", default_value = "plot.html")]
         output: PathBuf,
     },
 }
@@ -169,6 +177,10 @@ pub fn process_cli() {
         Some(Commands::Download { output }) => {
             download(output.to_path_buf());
         }
+        Some(Commands::Plot { input, output }) => {
+            let _ = plot(input.to_path_buf(), output.to_path_buf());
+        }
+
         None => {}
     }
 }

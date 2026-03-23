@@ -71,9 +71,11 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
             let run =
                 run_from_filename(&path).ok_or("Failed to extract run from summary filename")?;
             Ok(
-                LazyCsvReader::new(path.to_str().ok_or("Invalid summary path")?.into())
+                CsvReadOptions::default()
                     .with_has_header(true)
+                    .try_into_reader_with_file_path(Some(path))?
                     .finish()?
+                    .lazy()
                     .with_column(lit(run.patient.to_string()).alias("patient"))
                     .with_column(lit(run.capture.to_string()).alias("capture"))
                     .with_column(lit(run.sequencer.to_string()).alias("sequencer"))
