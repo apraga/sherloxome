@@ -5,6 +5,7 @@
 //! For GIAB patients, [see here](crate::giab)
 //!
 use crate::giab::{Patient, patient_from_filename};
+use log;
 use serde::Deserialize;
 use std::fs::File;
 use std::io::Write;
@@ -585,7 +586,7 @@ pub fn samplesheet_row(run: Run, file: &mut File) {
         "{:}-{:}-{:}-{:}",
         run.patient, run.sequencer, run.capture, run.depth
     );
-    println!("{:?}", sample);
+    log::debug!("{:?}", sample);
     let fastq1 = url(run, "R1");
     let fastq2 = url(run, "R2");
 

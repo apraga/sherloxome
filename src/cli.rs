@@ -1,4 +1,5 @@
 use crate::analyze::analyze;
+use crate::controls::sample_clinvar;
 use crate::download_blocking;
 use crate::fastqbaid2020::{Capture, Depth, Run, Sequencer};
 use crate::fastqbaid2020::{available, samplesheet_real};
@@ -71,11 +72,16 @@ enum Commands {
         #[arg(short, long, value_name = "OUTPUT_DIR")]
         output: PathBuf,
     },
+    /// Generate controls from clinvar data
+    Controls {
+        /// Sets a custom config file (TOML) for each command
+        #[arg(short, long, value_name = "FILE", default_value = "config.toml")]
+        config: PathBuf,
+    },
     Download {
         #[arg(short, long, value_name = "OUTPUT_DIR", default_value = "data/ref")]
         output: PathBuf,
     },
-
     Plot {
         #[arg(short, long, value_name = "INPUT_FILE")]
         input: PathBuf,
@@ -154,6 +160,28 @@ fn download(out_dir: PathBuf) {
     }
 }
 
+/// Wrapper to generate controls from clinvar data for several captures files
+/// Add some checks in configuration files
+fn generate_controls(conf: Config) {
+    let Some(silico) = conf.silico else {
+        log::error!("in silico data should be defined in config.toml");
+        return;
+    };
+    let args = silico.captures.iter().filter_map(|capture| {
+        let bed = conf.capture.get(&capture.to_string()).or_else(|| {
+            log::error!("No bed file for {capture}");
+            None
+        })?;
+        Some((capture, PathBuf::from(bed)))
+    });
+    args.for_each(|(capture, bed)| {
+        let output = PathBuf::from(format!("data/exp_raw/clinvar_{capture}.vcf.gz"));
+        if let Err(e) = sample_clinvar(bed, 50, output) {
+            log::error!("Failed to generate controls for {capture}: {e}");
+        }
+    });
+}
+
 fn read_config(fname: PathBuf) -> Config {
     let content = std::fs::read_to_string(fname).unwrap();
     let conf: Config = toml::from_str(&content).unwrap();
@@ -165,6 +193,7 @@ pub fn process_cli() {
     let cli = Cli::parse();
     match &cli.command {
         Some(Commands::Samplesheet { config }) => {
+            log::info!("Generating samplesheet...");
             generate_samplesheet(config.to_path_buf());
         }
         Some(Commands::Analyze {
@@ -172,6 +201,7 @@ pub fn process_cli() {
             input,
             output,
         }) => {
+            log::info!("Analyzing runs...");
             let conf = read_config(config.to_path_buf());
             if let Err(e) = analyze(
                 &conf.fasta,
@@ -183,6 +213,13 @@ pub fn process_cli() {
                 std::process::exit(1);
             }
         }
+
+        Some(Commands::Controls { config }) => {
+            log::info!("Generating controls...");
+            let conf = read_config(config.to_path_buf());
+            generate_controls(conf);
+        }
+
         Some(Commands::Download { output }) => {
             download(output.to_path_buf());
         }
