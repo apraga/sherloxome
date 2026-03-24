@@ -10,3 +10,6 @@ giab
 # Added by cargo
 
 /target
+*.gz
+*.gz.tbi
+
