@@ -24,7 +24,16 @@ struct Config {
 
 #[derive(Deserialize, Debug)]
 struct SilicoConfig {
+    captures: Vec<Capture>,
+    fastq: bool,
+    control: Option<PathBuf>,
+    bam: SilicoBamConfig,
+}
+
+#[derive(Deserialize, Debug)]
+struct SilicoBamConfig {
     patients: Vec<Patient>,
+    file: Option<PathBuf>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -125,11 +134,11 @@ fn generate_samplesheet(config_file: PathBuf) {
     }
 
     if let Some(silico) = &config.silico {
-        println!("Silico patients: {:?}", silico.patients);
-    } else {
-        println!("No silico patients...");
+        samplesheet_silico(silico);
     }
 }
+
+fn samplesheet_silico(config: &SilicoConfig) {}
 
 /// Download all reference VCF and BED in a directory.
 fn download(out_dir: PathBuf) {

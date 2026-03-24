@@ -1,13 +1,25 @@
-# Configuration for "real" GIAIB patients that haven't bee modified in silico
 fasta = "/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full_analysis_set.fna"
+
+# Configuration for raw GIAB patients data
 [real]
 patients = ["HG001", "HG002", "HG003", "HG004", "HG005", "HG006", "HG007"]
 depths = ["50x", "75x", "100x"]
 captures = ["agilent"] #, "idt", "truseq"]
 sequencers = ["hiseq4000", "novaseq"]
 
+# Insert controls into a patient BAM or generate in-silico fastq
 [silico]
+captures = ["agilent"]
+# Generate a fastq fully in silico
+fastq = true
+# VCF file defining control. If empty, default to clinvar variant
+control = ""
+
+# Use a custom BAM or GIAB patient otherwise (mutually exclusive)
+[silico.bam]
+file = ""
 patients = ["HG001"]
+
 
 # Define here the name of the capture (used in the filename) and the bed file
 [capture]
