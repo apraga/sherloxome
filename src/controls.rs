@@ -8,12 +8,20 @@ use noodles::bgzf;
 use noodles::vcf;
 use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::info::field::Value;
+use rand::RngExt;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
+use std::io::BufWriter;
+use std::io::Write;
 use std::path::PathBuf;
 
+struct Snv {
+    chrom: String, // chr-prefixed
+    pos: u64,      // 1-based
+    alt: String,
+}
 fn download_clinvar() -> PathBuf {
     log::debug!("Downloading clinvar vcf...");
     let mut url: String =
@@ -108,34 +116,60 @@ fn is_snv(record: &vcf::Record) -> bool {
             .all(|a| a.len() == 1)
 }
 
+// Generate AF betwen 0.4 and 0.6
+fn write_varben(
+    w: &mut impl Write,
+    snv: &Snv,
+    rng: &mut impl RngExt,
+) -> Result<(), Box<dyn Error>> {
+    let s = snv.pos - 1;
+    let af: f64 = rng.random_range(0.4..0.6);
+    writeln!(w, "{}\t{}\t{}\t{}\tsnv\t{}", snv.chrom, s, s, af, snv.alt)?;
+    Ok(())
+}
+
 /// Select all clinvar pathogenic SNV inside the capture kit 50bp apart
+/// Output is both a mutation file for varben and a VCF
 /// Outputpath is hardcoded to data/exp_raw/clinvar_$CAPTURE
 /// The more efficient way is to parse the VCF and check if each variant is in the BED (stored as an interval tree)
-pub fn sample_clinvar(bed: PathBuf, spacing: u32, output: PathBuf) -> Result<(), Box<dyn Error>> {
+pub fn sample_clinvar(
+    bed: PathBuf,
+    spacing: u32,
+    vcf_out: PathBuf,
+    mut_out: PathBuf,
+) -> Result<(), Box<dyn Error>> {
     let vcf = download_clinvar();
 
+    // Prepare VCF file
     // Load BED into interval tree per chrom
     let capture = load_bed(&bed)?;
-    let mut vcf_reader = File::open(vcf)
+    let mut reader = File::open(vcf)
         .map(bgzf::io::Reader::new)
         .map(vcf::io::Reader::new)?;
-    let vcf_header = vcf_reader.read_header()?;
-    let mut vcf_writer = File::create(&output)
+    let header = reader.read_header()?;
+    let mut writer = File::create(&vcf_out)
         .map(bgzf::io::Writer::new)
         .map(vcf::io::Writer::new)?;
-    vcf_writer.write_header(&vcf_header)?;
+    writer.write_header(&header)?;
+
+    // Prepare mutation file
+    let mut varben_w = BufWriter::new(File::create(&mut_out)?);
+    writeln!(varben_w, "#chrom\tstart\tend\tAF\ttype\talt")?;
 
     let mut last_pos: HashMap<String, u64> = HashMap::new();
+    let mut rng = rand::rng();
 
-    for result in vcf_reader.records() {
+    for result in reader.records() {
         let record = result?;
-        if let Some((chrom, pos)) = keep_variant(&record, &vcf_header, &capture, &last_pos, spacing)
-        {
-            last_pos.insert(chrom, pos);
-            vcf_writer.write_record(&vcf_header, &record)?;
+        if let Some(snv) = keep_variant(&record, &header, &capture, &last_pos, spacing) {
+            last_pos.insert(snv.chrom.clone(), snv.pos);
+            // Write VCF
+            writer.write_record(&header, &record)?;
+            write_varben(&mut varben_w, &snv, &mut rng)?;
         }
     }
-    log::debug!("Wrote {:?}", output);
+    varben_w.flush()?;
+    log::debug!("Wrote {:?} and {:?}", vcf_out, mut_out);
     Ok(())
 }
 
@@ -147,15 +181,21 @@ fn keep_variant(
     capture: &BedIndex,
     last_pos: &HashMap<String, u64>,
     spacing: u32,
-) -> Option<(String, u64)> {
+) -> Option<Snv> {
     let chrom = record.reference_sequence_name().to_string();
     let pos = usize::from(record.variant_start()?.ok()?) as u64;
     let last = last_pos.get(&chrom).copied().unwrap_or(0);
-
+    let alt = record
+        .alternate_bases()
+        .iter()
+        .filter_map(|a| a.ok())
+        .next()
+        .unwrap_or(".")
+        .to_string();
     (in_capture(capture, &chrom, pos)
         && is_not_benign(&record.info(), header)
         && is_snv(record)
         && pos != last
         && pos.abs_diff(last) >= spacing.into())
-    .then_some((chrom, pos))
+    .then_some(Snv { chrom, pos, alt })
 }

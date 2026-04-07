@@ -175,8 +175,9 @@ fn generate_controls(conf: Config) {
         Some((capture, PathBuf::from(bed)))
     });
     args.for_each(|(capture, bed)| {
-        let output = PathBuf::from(format!("data/exp_raw/clinvar_{capture}.vcf.gz"));
-        if let Err(e) = sample_clinvar(bed, 50, output) {
+        let vcf_out = PathBuf::from(format!("data/exp_raw/clinvar_{capture}.vcf.gz"));
+        let mut_out = PathBuf::from(format!("data/exp_raw/clinvar_{capture}.mut"));
+        if let Err(e) = sample_clinvar(bed, 50, vcf_out, mut_out) {
             log::error!("Failed to generate controls for {capture}: {e}");
         }
     });
