@@ -174,7 +174,7 @@ pub fn sample_clinvar(
 }
 
 /// Do it for a single record
-
+/// Input VCF may use chr prefix, output will have `chr` prefix.
 fn keep_variant(
     record: &vcf::Record,
     header: &vcf::Header,
@@ -182,9 +182,13 @@ fn keep_variant(
     last_pos: &HashMap<String, u64>,
     spacing: u32,
 ) -> Option<Snv> {
-    let chrom = record.reference_sequence_name().to_string();
+    let chrom_raw = record.reference_sequence_name().to_string();
+    // Remove chr prefix if needed
+    let chrom_nb = chrom_raw.strip_prefix("chr").unwrap_or(&chrom_raw);
+    let chrom_chr = format!("chr{}", chrom_nb);
+
     let pos = usize::from(record.variant_start()?.ok()?) as u64;
-    let last = last_pos.get(&chrom).copied().unwrap_or(0);
+    let last = last_pos.get(chrom_nb).copied().unwrap_or(0);
     let alt = record
         .alternate_bases()
         .iter()
@@ -192,10 +196,14 @@ fn keep_variant(
         .next()
         .unwrap_or(".")
         .to_string();
-    (in_capture(capture, &chrom, pos)
+    (in_capture(capture, &chrom_nb, pos)
         && is_not_benign(&record.info(), header)
         && is_snv(record)
         && pos != last
         && pos.abs_diff(last) >= spacing.into())
-    .then_some(Snv { chrom, pos, alt })
+    .then_some(Snv {
+        chrom: chrom_chr,
+        pos,
+        alt,
+    })
 }
