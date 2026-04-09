@@ -9,6 +9,7 @@ use noodles::vcf;
 use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::info::field::Value;
 use rand::RngExt;
+use rand::prelude::IteratorRandom;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -128,13 +129,53 @@ fn write_varben(
     Ok(())
 }
 
-/// Select all clinvar pathogenic SNV inside the capture kit 50bp apart
-/// Output is both a mutation file for varben and a VCF
-/// Outputpath is hardcoded to data/exp_raw/clinvar_$CAPTURE
-/// The more efficient way is to parse the VCF and check if each variant is in the BED (stored as an interval tree)
+/// Sort chromsome by natural ornder
+fn chrom_order(chrom: &str) -> (u8, u32) {
+    match chrom.trim_start_matches("chr") {
+        "X" => (1, 0),
+        "Y" => (2, 0),
+        "M" | "MT" => (3, 0),
+        n => (0, n.parse().unwrap_or(u32::MAX)),
+    }
+}
+
+fn sample_clinvar_variants(
+    reader: &mut vcf::io::Reader<bgzf::io::Reader<File>>,
+    header: &vcf::Header,
+    capture: &BedIndex,
+    spacing: u32,
+    n: usize,
+    rng: &mut impl RngExt,
+) -> Vec<(vcf::Record, Snv)> {
+    let mut last_pos: HashMap<String, u64> = HashMap::new();
+    let mut selected: Vec<(vcf::Record, Snv)> = reader
+        .records()
+        .filter_map(|r| r.ok())
+        .filter_map(|record| {
+            keep_variant(&record, &header, &capture, &last_pos, spacing).map(|snv| {
+                last_pos.insert(snv.chrom.clone(), snv.pos);
+                (record, snv)
+            })
+        })
+        .sample(rng, n);
+    selected.sort_by(|(_, a), (_, b)| {
+        chrom_order(&a.chrom)
+            .cmp(&chrom_order(&b.chrom))
+            .then(a.pos.cmp(&b.pos))
+    });
+
+    log::debug!("Selected {} variants", selected.len());
+    selected
+}
+
+/// Select n clinvar pathogenic SNV inside the capture kit 50bp apart.
+/// Output is both a mutation file for varben and a VCF (hardocoded into data/exp_raw/clinvar_$CAPTURE)
+/// The most efficient way is to parse clinvar once to get variant in the capture kit and 50pb apart.
+/// In a second pass, sample randomly n of theme
 pub fn sample_clinvar(
     bed: PathBuf,
     spacing: u32,
+    n: usize,
     vcf_out: PathBuf,
     mut_out: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
@@ -147,32 +188,46 @@ pub fn sample_clinvar(
         .map(bgzf::io::Reader::new)
         .map(vcf::io::Reader::new)?;
     let header = reader.read_header()?;
+    let mut rng = rand::rng();
+    let variants = sample_clinvar_variants(&mut reader, &header, &capture, spacing, n, &mut rng);
+
+    write_sampled_clinvar_vcf(&variants, &header, &vcf_out)?;
+    write_sampled_clinvar_mut(&variants, &mut_out, &mut rng)?;
+    log::debug!("Wrote {:?} and {:?}", vcf_out, mut_out);
+    Ok(())
+}
+
+fn write_sampled_clinvar_vcf(
+    variants: &Vec<(vcf::Record, Snv)>,
+    header: &vcf::Header,
+    vcf_out: &PathBuf,
+) -> Result<(), Box<dyn Error>> {
     let mut writer = File::create(&vcf_out)
         .map(bgzf::io::Writer::new)
         .map(vcf::io::Writer::new)?;
     writer.write_header(&header)?;
 
+    for (record, _) in variants {
+        writer.write_record(&header, record)?;
+    }
+    Ok(())
+}
+
+fn write_sampled_clinvar_mut(
+    variants: &Vec<(vcf::Record, Snv)>,
+    mut_out: &PathBuf,
+    rng: &mut impl RngExt,
+) -> Result<(), Box<dyn Error>> {
     // Prepare mutation file
     let mut varben_w = BufWriter::new(File::create(&mut_out)?);
     writeln!(varben_w, "#chrom\tstart\tend\tAF\ttype\talt")?;
 
-    let mut last_pos: HashMap<String, u64> = HashMap::new();
-    let mut rng = rand::rng();
-
-    for result in reader.records() {
-        let record = result?;
-        if let Some(snv) = keep_variant(&record, &header, &capture, &last_pos, spacing) {
-            last_pos.insert(snv.chrom.clone(), snv.pos);
-            // Write VCF
-            writer.write_record(&header, &record)?;
-            write_varben(&mut varben_w, &snv, &mut rng)?;
-        }
+    for (_, snv) in variants {
+        write_varben(&mut varben_w, snv, rng)?;
     }
     varben_w.flush()?;
-    log::debug!("Wrote {:?} and {:?}", vcf_out, mut_out);
     Ok(())
 }
-
 /// Do it for a single record
 /// Input VCF may use chr prefix, output will have `chr` prefix.
 fn keep_variant(
