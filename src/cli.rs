@@ -9,6 +9,7 @@ use crate::plot::plot;
 use clap::{Parser, Subcommand};
 use itertools::iproduct;
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::path::PathBuf;
 use toml;
 
@@ -25,16 +26,11 @@ struct Config {
 
 #[derive(Deserialize, Debug)]
 struct SilicoConfig {
-    captures: Vec<Capture>,
+    capture: Capture,
     fastq: bool,
     control: Option<PathBuf>,
-    bam: SilicoBamConfig,
-}
-
-#[derive(Deserialize, Debug)]
-struct SilicoBamConfig {
-    patients: Vec<Patient>,
-    file: Option<PathBuf>,
+    outdir: PathBuf,
+    bam: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -161,26 +157,71 @@ fn download(out_dir: PathBuf) {
 }
 
 /// Wrapper to generate controls from clinvar data for several captures files
-/// Add some checks in configuration files
+/// 1. Generate mutation files for varben (one for each capture)
+/// 2. Run a small pipeline to use varben on each mutation file
 fn generate_controls(conf: Config) {
-    let Some(silico) = conf.silico else {
-        log::error!("in silico data should be defined in config.toml");
-        return;
-    };
-    let args = silico.captures.iter().filter_map(|capture| {
-        let bed = conf.capture.get(&capture.to_string()).or_else(|| {
-            log::error!("No bed file for {capture}");
-            None
-        })?;
-        Some((capture, PathBuf::from(bed)))
-    });
-    args.for_each(|(capture, bed)| {
-        let vcf_out = PathBuf::from(format!("data/exp_raw/clinvar_{capture}.vcf.gz"));
-        let mut_out = PathBuf::from(format!("data/exp_raw/clinvar_{capture}.mut"));
-        if let Err(e) = sample_clinvar(bed, 50, 1000, vcf_out, mut_out) {
-            log::error!("Failed to generate controls for {capture}: {e}");
-        }
-    });
+    if let Err(e) = try_generate_controls(conf) {
+        log::error!("Failed to generate insilico controls: {e}");
+    }
+}
+
+fn try_generate_controls(conf: Config) -> Result<(), Box<dyn Error>> {
+    let silico = conf.silico.ok_or("missing [silico] in config")?;
+    let capture = silico.capture;
+    let bed = conf
+        .capture
+        .get(&capture.to_string())
+        .ok_or_else(|| format!("No bed file for {capture}"))?;
+
+    let outdir = silico.outdir.join("varben");
+    std::fs::create_dir_all(&outdir)?;
+
+    let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
+    let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
+
+    sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
+
+    // let silico = conf.silico.as_ref().ok_or("missing [silico] in config")?;
+    // let capture = silico.capture;
+    // let bed = conf
+    //     .capture
+    //     .get(capture.as_str())
+    //     .ok_or_else(|| format!("No bed file for {capture}"))?;
+
+    // // Generate all .mut files and build samplesheet
+    // let outdir = conf.silico.outdir.append("varben");
+    // let samplesheet = conf.silico.outdir.join("samplesheet.csv");
+    // let mut w = BufWriter::new(File::create(&samplesheet)?);
+    // writeln!(w, "capture,mut")?;
+
+    // let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
+    // let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
+
+    // sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
+    // writeln!(w, "{capture},{}", mut_out.display())?;
+    // w.flush()?;
+
+    // // Single nextflow invocation for all captures in parallel
+    // let status = Command::new("nextflow")
+    //     .arg("run")
+    //     .arg("pipelines/insilico.nf")
+    //     .arg("-profile")
+    //     .arg(profile)
+    //     .arg("--samplesheet")
+    //     .arg(&samplesheet)
+    //     .arg("--bam")
+    //     .arg(&bam)
+    //     .arg("--genome")
+    //     .arg(&genome)
+    //     .arg("--outdir")
+    //     .arg(&outdir)
+    //     .arg("-resume")
+    //     .status()?;
+
+    // if !status.success() {
+    //     return Err(format!("Nextflow exited with {}", status).into());
+    // }
+    Ok(())
 }
 
 fn read_config(fname: PathBuf) -> Config {

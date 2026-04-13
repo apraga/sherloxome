@@ -123,9 +123,12 @@ fn write_varben(
     snv: &Snv,
     rng: &mut impl RngExt,
 ) -> Result<(), Box<dyn Error>> {
-    let s = snv.pos - 1;
     let af: f64 = rng.random_range(0.4..0.6);
-    writeln!(w, "{}\t{}\t{}\t{}\tsnv\t{}", snv.chrom, s, s, af, snv.alt)?;
+    writeln!(
+        w,
+        "{}\t{}\t{}\t{}\tsnv\t{}",
+        snv.chrom, snv.pos, snv.pos, af, snv.alt
+    )?;
     Ok(())
 }
 
