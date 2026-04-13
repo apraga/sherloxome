@@ -16,7 +16,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use url::Url;
 
 struct Snv {
     chrom: String, // chr-prefixed
@@ -264,4 +265,104 @@ fn keep_variant(
         pos,
         alt,
     })
+}
+
+/// Helper function to index a BAM file
+pub fn index_bam(bam: &PathBuf) {
+    let bai = bam.with_extension("bam.bai");
+    // Index the BAM
+    if !bai.exists() {
+        log::debug!("Indexing bam");
+        let _ = std::process::Command::new("samtools")
+            .args(["index", &bam.to_string_lossy()])
+            .status()
+            .expect("Failed to run samtools index");
+    } else {
+        log::debug!("{:?} already exists ", bai);
+    }
+}
+
+/// Bam to fastq conversion require hard clips removale
+pub fn remove_hard_clips(bam: &PathBuf) -> PathBuf {
+    let stem = bam.file_stem().unwrap().to_string_lossy();
+    let parent = bam.parent().unwrap_or(Path::new("."));
+    let filtered = parent.join(format!("{stem}_nohardclip.bam"));
+
+    if !filtered.exists() {
+        log::info!("Removing hard clips");
+        let cmd = format!(
+            "samtools view -h {} | awk '$6 !~ /H/{{print}}' | samtools view -bS - > {}",
+            bam.display(),
+            filtered.display()
+        );
+        let _ = std::process::Command::new("sh")
+            .args(["-c", &cmd])
+            .status()
+            .expect("Failed to run hard clip filter");
+    } else {
+        log::info!("Hardlink removal already done");
+    }
+    return filtered;
+}
+
+/// Download a bam file if it's an url, otherwise check the file exist
+pub fn resolve_bam(bam: String, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+    if bam.starts_with("http://") || bam.starts_with("https://") {
+        download_bam(bam, outdir)
+    } else {
+        let path = PathBuf::from(bam);
+        if !path.exists() {
+            return Err(format!("BAM file not found: {}", path.display()).into());
+        }
+        Ok(path)
+    }
+}
+
+fn download_bam(url: String, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+    let parsed = Url::parse(&url)?;
+    log::info!("Downloading bam file {}", url);
+    let filename = parsed
+        .path_segments()
+        .and_then(|s| s.last())
+        .filter(|s| !s.is_empty())
+        .ok_or("could not extract filename from URL")?;
+
+    let output = outdir.join(filename);
+    download_blocking(&url, &output);
+    Ok(output)
+}
+/// Generate controls from clinvar variant into a BAM file
+/// 1. Sample clinvar randomly
+/// 2. Generate mutation files from those clinvar variant for varben
+/// 2. Apply varben on a single bam file
+pub fn edit_bam(bam: PathBuf, bed: &String, capture: String) -> Result<(), Box<dyn Error>> {
+    let outdir = PathBuf::from("data/exp_raw");
+    std::fs::create_dir_all(&outdir)?;
+
+    // sample 1000 clinvar variant 50bp apart
+    let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
+    let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
+    sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
+
+    // // Single nextflow invocation for all captures in parallel
+    // let status = Command::new("nextflow")
+    //     .arg("run")
+    //     .arg("pipelines/insilico.nf")
+    //     .arg("-profile")
+    //     .arg(profile)
+    //     .arg("--samplesheet")
+    //     .arg(&samplesheet)
+    //     .arg("--bam")
+    //     .arg(&bam)
+    //     .arg("--genome")
+    //     .arg(&genome)
+    //     .arg("--outdir")
+    //     .arg(&outdir)
+    //     .arg("-resume")
+    //     .status()?;
+
+    // if !status.success() {
+    //     return Err(format!("Nextflow exited with {}", status).into());
+    // }
+    Ok(())
 }

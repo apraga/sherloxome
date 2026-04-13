@@ -3231,6 +3231,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "url",
  "vega_lite_4",
 ]
 
