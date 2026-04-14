@@ -1,5 +1,5 @@
 use crate::analyze::analyze;
-use crate::controls::{check_controls_deps, edit_bam, index_bam, remove_hard_clips, resolve_bam};
+use crate::controls::*;
 use crate::download_blocking;
 use crate::fastqbaid2020::{Capture, Depth, Run, Sequencer};
 use crate::fastqbaid2020::{available, samplesheet_real};
@@ -175,11 +175,12 @@ fn try_generate_controls(conf: Config) -> Result<(), Box<dyn Error>> {
         .get(&capture.to_string())
         .ok_or_else(|| format!("No bed file for {capture}"))?;
     if let Some(bam) = silico.bam {
-        log::info!("Editing BAM to insert control : {:?}", bam);
+        log::info!("Editing BAM to insert control");
         let bam_path = resolve_bam(bam, &outdir)?;
         index_bam(&bam_path)?;
         let bam_cleaned = remove_hard_clips(&bam_path)?;
-        edit_bam(bam_cleaned, bed, capture.to_string(), conf.fasta)?;
+        let new_bam = edit_bam(bam_cleaned, bed, capture.to_string(), conf.fasta)?;
+        let (fq1, fq2) = bam_to_fastq(new_bam, bam_path)?;
     } else {
         log::info!("No BAM editing...");
     }

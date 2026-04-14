@@ -17,7 +17,8 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::ExitStatus;
+use std::process::{Command, Stdio};
 use std::thread;
 use url::Url;
 use which::which;
@@ -301,7 +302,7 @@ pub fn index_bam(bam: &PathBuf) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Bam to fastq conversion require hard clips removale
+/// Bam to fastq conversion require hard clips removal
 pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let stem = bam.file_stem().unwrap().to_string_lossy();
     let parent = bam.parent().unwrap_or(Path::new("."));
@@ -325,6 +326,7 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     } else {
         log::info!("Hardlink removal already done");
     }
+    index_bam(&filtered)?;
     Ok(filtered)
 }
 
@@ -363,7 +365,7 @@ pub fn edit_bam(
     bed: &String,
     capture: String,
     fasta: PathBuf,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<PathBuf, Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
 
@@ -371,9 +373,7 @@ pub fn edit_bam(
     let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
     sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
-    let new_bam = insert_variants(mut_out, bam, fasta, outdir)?;
-    let (fq1, fq2) = bam_to_fastq(new_bam)?;
-    Ok(())
+    insert_variants(mut_out, bam, fasta, outdir)
 }
 
 /// Use varben (muteditor) to insert a list of variant in a bed files. Require varben, samtools, bwa
@@ -384,14 +384,38 @@ fn insert_variants(
     bam: PathBuf,
     fasta: PathBuf,
     outdir: PathBuf,
-) -> Result<(PathBuf), Box<dyn Error>> {
+) -> Result<PathBuf, Box<dyn Error>> {
+    let outdir_ = outdir.join("varben");
+    std::fs::create_dir_all(&outdir_)?;
+
     let fasta_str = fasta.to_str().ok_or("Invalid fasta path")?;
     let mut_str = mut_file.to_str().ok_or("Invalid mutation file path")?;
     let bam_str = bam.to_str().ok_or("Invalid BAM path")?;
-    let outdir_ = outdir.join("varben");
-    std::fs::create_dir_all(&outdir_)?;
     let outdir_str = outdir_.to_str().ok_or("Invalid output folder")?;
-    let status = Command::new("muteditor")
+
+    let output = outdir_.join("edit.sorted.bam");
+    if output.exists() {
+        log::debug!("{:?} already exists", output);
+    } else {
+        let log_path = outdir_.join("varben.log");
+        let status = insert_variants_varben(mut_str, bam_str, fasta_str, outdir_str, log_path)?;
+        if !status.success() {
+            return Err(format!("muteditor exited with status {status}").into());
+        }
+    }
+    Ok(output)
+}
+
+fn insert_variants_varben(
+    mut_str: &str,
+    bam_str: &str,
+    fasta_str: &str,
+    outdir_str: &str,
+    log_path: PathBuf,
+) -> Result<ExitStatus, std::io::Error> {
+    let log_file = File::create(&log_path)?;
+
+    Command::new("muteditor")
         .args([
             "-m",
             mut_str,
@@ -408,18 +432,26 @@ fn insert_variants(
             "-o",
             outdir_str,
         ])
-        .status()?;
-    if !status.success() {
-        return Err(format!("muteditor exited with status {status}").into());
-    }
-    Ok(outdir_.join("edit.sorted.bam"))
+        .stdout(Stdio::from(log_file))
+        .status()
 }
-
 /// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
 /// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
-fn bam_to_fastq(bam: PathBuf) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let fq1 = bam.with_extension("_1.fq.gz");
-    let fq2 = bam.with_extension("_2.fq.gz");
+pub fn bam_to_fastq(bam: PathBuf, old_bam: PathBuf) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+    let fq1 = old_bam.with_extension("_1.fq.gz");
+    let fq2 = old_bam.with_extension("_2.fq.gz");
+    if fq1.exists() && fq2.exists() {
+        log::debug!("Output fastq already exists");
+        Ok((fq1, fq2))
+    } else {
+        run_bam_to_fastq(bam, fq1, fq2)
+    }
+}
+pub fn run_bam_to_fastq(
+    bam: PathBuf,
+    fq1: PathBuf,
+    fq2: PathBuf,
+) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     let cmd = format!(
         "samtools sort -n {bam} -@ {threads} | samtools fastq -1 {fq1} -2 {fq2} -0 /dev/null -s /dev/null -n -@ {threads} -",
         bam = bam.display(),

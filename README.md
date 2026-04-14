@@ -16,7 +16,7 @@ Software (TODO flakes)
 
 Rust (rustup for now)
 
-## Analyse real patients
+## Download real patients data (GIAB)
 
 Generate a samplesheet `samplesheet.csv` with
 
@@ -37,7 +37,27 @@ sequencers = ["hiseq4000", "novaseq"]
 patients = ["HG001"]
 ```
 
-### Run
+
+## Generate controls
+
+Setup your config.toml to use a BAM file
+```toml
+[silico]
+capture = "agilent"
+# Either an URL or a local link to insert variants in a BAM file
+bam = "https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam"
+# Required for generating a bam file
+fasta = "/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full_analysis_set.fna"
+```
+
+Then run
+```bash
+cargo run --release controls
+```
+This requires bwa, samtools and varben to be installed beforehand. `varben` is rather long so it should be started from a slurm job directly.
+TODO : what this does
+
+## Run
 
 Assuming you want to run all agilent runs, and that you use repro-sarek, go into repro-sarek directory, then
 
