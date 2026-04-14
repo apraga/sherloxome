@@ -14,6 +14,8 @@ capture = "agilent"
 fastq = true
 # Either an URL or a local link to insert variants in a BAM file
 bam = "https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam"
+# Required for generating a bam file
+fasta = "/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full_analysis_set.fna"
 outdir = "silico"
 
 

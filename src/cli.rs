@@ -1,5 +1,5 @@
 use crate::analyze::analyze;
-use crate::controls::{edit_bam, index_bam, remove_hard_clips, resolve_bam};
+use crate::controls::{check_controls_deps, edit_bam, index_bam, remove_hard_clips, resolve_bam};
 use crate::download_blocking;
 use crate::fastqbaid2020::{Capture, Depth, Run, Sequencer};
 use crate::fastqbaid2020::{available, samplesheet_real};
@@ -28,9 +28,8 @@ struct Config {
 #[derive(Deserialize, Debug)]
 struct SilicoConfig {
     capture: Capture,
-    fastq: bool,
-    control: Option<PathBuf>,
-    outdir: PathBuf,
+    // fastq: bool,
+    fasta: PathBuf,
     bam: Option<String>,
 }
 
@@ -159,6 +158,7 @@ fn download(out_dir: PathBuf) {
 
 /// Wrapper to generate controls from clinvar data for several captures files
 fn generate_controls(conf: Config) {
+    check_controls_deps();
     if let Err(e) = try_generate_controls(conf) {
         log::error!("Failed to generate insilico controls: {e}");
     }
@@ -177,9 +177,9 @@ fn try_generate_controls(conf: Config) -> Result<(), Box<dyn Error>> {
     if let Some(bam) = silico.bam {
         log::info!("Editing BAM to insert control : {:?}", bam);
         let bam_path = resolve_bam(bam, &outdir)?;
-        index_bam(&bam_path);
-        let bam_cleand = remove_hard_clips(&bam_path);
-        edit_bam(bam_cleand, bed, capture.to_string())?;
+        index_bam(&bam_path)?;
+        let bam_cleaned = remove_hard_clips(&bam_path)?;
+        edit_bam(bam_cleaned, bed, capture.to_string(), conf.fasta)?;
     } else {
         log::info!("No BAM editing...");
     }

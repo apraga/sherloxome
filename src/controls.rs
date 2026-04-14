@@ -17,12 +17,27 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::thread;
 use url::Url;
+use which::which;
 
 struct Snv {
     chrom: String, // chr-prefixed
     pos: u64,      // 1-based
     alt: String,
+}
+
+pub fn check_controls_deps() {
+    let tools = ["bwa", "samtools", "muteditor"];
+
+    log::debug!("Checking dependencies");
+    for tool in tools {
+        match which(tool) {
+            Ok(path) => log::debug!("{tool} ✓  ({})", path.display()),
+            Err(_) => panic!("{tool} ✗  not found in PATH"),
+        }
+    }
 }
 fn download_clinvar() -> PathBuf {
     log::debug!("Downloading clinvar vcf...");
@@ -268,22 +283,26 @@ fn keep_variant(
 }
 
 /// Helper function to index a BAM file
-pub fn index_bam(bam: &PathBuf) {
+pub fn index_bam(bam: &PathBuf) -> Result<(), Box<dyn Error>> {
     let bai = bam.with_extension("bam.bai");
     // Index the BAM
     if !bai.exists() {
         log::debug!("Indexing bam");
-        let _ = std::process::Command::new("samtools")
+        let status = Command::new("samtools")
             .args(["index", &bam.to_string_lossy()])
             .status()
             .expect("Failed to run samtools index");
+        if !status.success() {
+            return Err(format!("samtools index exited with status {status}").into());
+        }
     } else {
         log::debug!("{:?} already exists ", bai);
     }
+    Ok(())
 }
 
 /// Bam to fastq conversion require hard clips removale
-pub fn remove_hard_clips(bam: &PathBuf) -> PathBuf {
+pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let stem = bam.file_stem().unwrap().to_string_lossy();
     let parent = bam.parent().unwrap_or(Path::new("."));
     let filtered = parent.join(format!("{stem}_nohardclip.bam"));
@@ -295,14 +314,18 @@ pub fn remove_hard_clips(bam: &PathBuf) -> PathBuf {
             bam.display(),
             filtered.display()
         );
-        let _ = std::process::Command::new("sh")
+        let status = Command::new("sh")
             .args(["-c", &cmd])
             .status()
             .expect("Failed to run hard clip filter");
+
+        if !status.success() {
+            return Err(format!("samtools exited with status {status}").into());
+        }
     } else {
         log::info!("Hardlink removal already done");
     }
-    return filtered;
+    Ok(filtered)
 }
 
 /// Download a bam file if it's an url, otherwise check the file exist
@@ -335,7 +358,12 @@ fn download_bam(url: String, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>
 /// 1. Sample clinvar randomly
 /// 2. Generate mutation files from those clinvar variant for varben
 /// 2. Apply varben on a single bam file
-pub fn edit_bam(bam: PathBuf, bed: &String, capture: String) -> Result<(), Box<dyn Error>> {
+pub fn edit_bam(
+    bam: PathBuf,
+    bed: &String,
+    capture: String,
+    fasta: PathBuf,
+) -> Result<(), Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
 
@@ -343,26 +371,73 @@ pub fn edit_bam(bam: PathBuf, bed: &String, capture: String) -> Result<(), Box<d
     let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
     sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
-
-    // // Single nextflow invocation for all captures in parallel
-    // let status = Command::new("nextflow")
-    //     .arg("run")
-    //     .arg("pipelines/insilico.nf")
-    //     .arg("-profile")
-    //     .arg(profile)
-    //     .arg("--samplesheet")
-    //     .arg(&samplesheet)
-    //     .arg("--bam")
-    //     .arg(&bam)
-    //     .arg("--genome")
-    //     .arg(&genome)
-    //     .arg("--outdir")
-    //     .arg(&outdir)
-    //     .arg("-resume")
-    //     .status()?;
-
-    // if !status.success() {
-    //     return Err(format!("Nextflow exited with {}", status).into());
-    // }
+    let new_bam = insert_variants(mut_out, bam, fasta, outdir)?;
+    let (fq1, fq2) = bam_to_fastq(new_bam)?;
     Ok(())
+}
+
+/// Use varben (muteditor) to insert a list of variant in a bed files. Require varben, samtools, bwa
+/// Require a reference genome and a bwa index
+/// Output folder is the varben subfolder of `outdir`
+fn insert_variants(
+    mut_file: PathBuf,
+    bam: PathBuf,
+    fasta: PathBuf,
+    outdir: PathBuf,
+) -> Result<(PathBuf), Box<dyn Error>> {
+    let fasta_str = fasta.to_str().ok_or("Invalid fasta path")?;
+    let mut_str = mut_file.to_str().ok_or("Invalid mutation file path")?;
+    let bam_str = bam.to_str().ok_or("Invalid BAM path")?;
+    let outdir_ = outdir.join("varben");
+    std::fs::create_dir_all(&outdir_)?;
+    let outdir_str = outdir_.to_str().ok_or("Invalid output folder")?;
+    let status = Command::new("muteditor")
+        .args([
+            "-m",
+            mut_str,
+            "-p",
+            &nb_threads().to_string(),
+            "-b",
+            bam_str,
+            "-r",
+            fasta_str,
+            "--aligner",
+            "bwa",
+            "--alignerIndex",
+            fasta_str,
+            "-o",
+            outdir_str,
+        ])
+        .status()?;
+    if !status.success() {
+        return Err(format!("muteditor exited with status {status}").into());
+    }
+    Ok(outdir_.join("edit.sorted.bam"))
+}
+
+/// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
+/// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
+fn bam_to_fastq(bam: PathBuf) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+    let fq1 = bam.with_extension("_1.fq.gz");
+    let fq2 = bam.with_extension("_2.fq.gz");
+    let cmd = format!(
+        "samtools sort -n {bam} -@ {threads} | samtools fastq -1 {fq1} -2 {fq2} -0 /dev/null -s /dev/null -n -@ {threads} -",
+        bam = bam.display(),
+        fq1 = fq1.display(),
+        fq2 = fq2.display(),
+        threads = nb_threads(),
+    );
+
+    let status = Command::new("sh").args(["-c", &cmd]).status()?;
+
+    if !status.success() {
+        return Err(format!("bam to fastq conversion exited with {status}").into());
+    }
+    Ok((fq1, fq2))
+}
+
+fn nb_threads() -> usize {
+    thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
 }
