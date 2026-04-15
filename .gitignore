@@ -12,4 +12,13 @@ giab
 /target
 *.gz
 *.gz.tbi
-
+.nextflow*
+work
+*.bam
+data/exp_raw/varben
+test
+work
+data/ref/GCA*
+*.mut
+*.bai
+.nextflow.log

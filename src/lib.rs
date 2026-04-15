@@ -1,10 +1,11 @@
 pub mod analyze;
 use std::time::Duration;
 pub mod cli;
-pub mod controls;
 pub mod fastqbaid2020;
 pub mod giab;
 pub mod plot;
+pub mod setup;
+pub mod silico;
 use log;
 use std::path::PathBuf;
 

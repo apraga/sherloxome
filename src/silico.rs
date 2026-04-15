@@ -331,7 +331,7 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
 }
 
 /// Download a bam file if it's an url, otherwise check the file exist
-pub fn resolve_bam(bam: String, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+pub fn resolve_bam(bam: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     if bam.starts_with("http://") || bam.starts_with("https://") {
         download_bam(bam, outdir)
     } else {
@@ -343,7 +343,7 @@ pub fn resolve_bam(bam: String, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Err
     }
 }
 
-fn download_bam(url: String, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+fn download_bam(url: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let parsed = Url::parse(&url)?;
     log::info!("Downloading bam file {}", url);
     let filename = parsed
@@ -361,19 +361,22 @@ fn download_bam(url: String, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>
 /// 2. Generate mutation files from those clinvar variant for varben
 /// 2. Apply varben on a single bam file
 pub fn edit_bam(
-    bam: PathBuf,
-    bed: &String,
-    capture: String,
+    bam: &PathBuf,
+    bed: &PathBuf,
+    capture: &str,
     fasta: PathBuf,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
 
+    index_bam(&bam)?;
+    let bam_cleaned = remove_hard_clips(&bam)?;
+
     // sample 1000 clinvar variant 50bp apart
     let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
     sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
-    insert_variants(mut_out, bam, fasta, outdir)
+    insert_variants(mut_out, bam_cleaned, fasta, outdir)
 }
 
 /// Use varben (muteditor) to insert a list of variant in a bed files. Require varben, samtools, bwa
@@ -438,8 +441,10 @@ fn insert_variants_varben(
 /// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
 /// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
 pub fn bam_to_fastq(bam: PathBuf, old_bam: PathBuf) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let fq1 = old_bam.with_extension("_1.fq.gz");
-    let fq2 = old_bam.with_extension("_2.fq.gz");
+    let stem = old_bam.file_stem().unwrap().to_string_lossy();
+    let parent = old_bam.parent().unwrap_or(Path::new("."));
+    let fq1 = parent.join(format!("{stem}_1.fq.gz"));
+    let fq2 = parent.join(format!("{stem}_2.fq.gz"));
     if fq1.exists() && fq2.exists() {
         log::debug!("Output fastq already exists");
         Ok((fq1, fq2))

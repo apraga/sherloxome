@@ -5,10 +5,8 @@
 //! For GIAB patients, [see here](crate::giab)
 //!
 use crate::giab::{Patient, patient_from_filename};
-use log;
+use crate::setup::SamplesheetRow;
 use serde::Deserialize;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::{collections::HashSet, fmt};
 
@@ -572,26 +570,19 @@ pub fn capture() -> Vec<Capture> {
     [Capture::Agilent, Capture::Idt, Capture::Truseq].to_vec()
 }
 
-pub fn samplesheet_real(runs: HashSet<Run>) {
-    let mut file = File::create("samplesheet.csv").unwrap();
-    file.write(b"patient,sample,lane,fastq_1,fastq_2\n")
-        .unwrap();
-    for run in runs {
-        samplesheet_row(run, &mut file);
-    }
-}
-
-pub fn samplesheet_row(run: Run, file: &mut File) {
+pub fn real_row(run: &Run) -> SamplesheetRow {
     let sample = format!(
         "{:}-{:}-{:}-{:}",
         run.patient, run.sequencer, run.capture, run.depth
     );
-    log::debug!("{:?}", sample);
-    let fastq1 = url(run, "R1");
-    let fastq2 = url(run, "R2");
 
-    let row = format!("{},{sample},1,{fastq1},{fastq2}\n", run.patient);
-    file.write(row.as_bytes()).unwrap();
+    return SamplesheetRow {
+        patient: run.patient.to_string(),
+        sample: sample,
+        lane: 1,
+        fastq_1: url(*run, "R1"),
+        fastq_2: url(*run, "R2"),
+    };
 }
 
 /// Use google cloud URL. Nextflow will download the data
