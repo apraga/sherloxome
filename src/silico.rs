@@ -1,18 +1,22 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
-
 use crate::download_blocking;
 use log;
 use noodles::bed;
 use noodles::bgzf;
+use noodles::fasta;
 use noodles::vcf;
+use noodles::vcf::variant::RecordBuf;
+use noodles::vcf::variant::io::Write as VCFWrite;
 use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::info::field::Value;
+use noodles::vcf::variant::record_buf::AlternateBases as AltBasesBuf;
 use rand::RngExt;
 use rand::prelude::IteratorRandom;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
+use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
@@ -22,12 +26,6 @@ use std::process::{Command, Stdio};
 use std::thread;
 use url::Url;
 use which::which;
-
-struct Snv {
-    chrom: String, // chr-prefixed
-    pos: u64,      // 1-based
-    alt: String,
-}
 
 pub fn check_controls_deps() {
     let tools = ["bwa", "samtools", "muteditor"];
@@ -67,8 +65,10 @@ fn load_bed(bed: &PathBuf) -> Result<BedIndex, Box<dyn Error>> {
     let mut record = bed::Record::default();
 
     while reader.read_record(&mut record)? != 0 {
-        let chrom = std::str::from_utf8(record.reference_sequence_name())?
-            .trim_start_matches("chr")
+        let chrom_raw = std::str::from_utf8(record.reference_sequence_name())?;
+        let chrom = chrom_raw
+            .strip_prefix("chr")
+            .unwrap_or(chrom_raw)
             .to_string();
         let start = usize::from(record.feature_start()?);
         let end = usize::from(record.feature_end().ok_or("missing BED end position")??);
@@ -134,17 +134,24 @@ fn is_snv(record: &vcf::Record) -> bool {
             .all(|a| a.len() == 1)
 }
 
-// Generate AF betwen 0.4 and 0.6
+/// Write VCF record to varben format. Assume chromosoes do NOT have a chr prefix
+/// Generate AF betwen 0.4 and 0.6
 fn write_varben(
     w: &mut impl Write,
-    snv: &Snv,
+    record: &RecordBuf,
     rng: &mut impl RngExt,
 ) -> Result<(), Box<dyn Error>> {
     let af: f64 = rng.random_range(0.4..0.6);
+    let chrom_raw = record.reference_sequence_name();
+    let chrom_nb = chrom_raw.strip_prefix("chr").unwrap_or(chrom_raw);
+    let chrom_chr = format!("chr{}", chrom_nb);
+    let pos = record.variant_start().unwrap();
+    let alt = record.alternate_bases();
+    let alt_merged = alt.iter().filter_map(|a| a.ok()).next().unwrap_or(".");
     writeln!(
         w,
         "{}\t{}\t{}\t{}\tsnv\t{}",
-        snv.chrom, snv.pos, snv.pos, af, snv.alt
+        chrom_chr, pos, pos, af, alt_merged
     )?;
     Ok(())
 }
@@ -159,6 +166,7 @@ fn chrom_order(chrom: &str) -> (u8, u32) {
     }
 }
 
+/// Sample clinvar variant and prefix "chr" to chromosome names
 fn sample_clinvar_variants(
     reader: &mut vcf::io::Reader<bgzf::io::Reader<File>>,
     header: &vcf::Header,
@@ -166,26 +174,31 @@ fn sample_clinvar_variants(
     spacing: u32,
     n: usize,
     rng: &mut impl RngExt,
-) -> Vec<(vcf::Record, Snv)> {
+) -> Vec<RecordBuf> {
     let mut last_pos: HashMap<String, u64> = HashMap::new();
-    let mut selected: Vec<(vcf::Record, Snv)> = reader
+    let mut selected: Vec<RecordBuf> = reader
         .records()
         .filter_map(|r| r.ok())
-        .filter_map(|record| {
-            keep_variant(&record, &header, &capture, &last_pos, spacing).map(|snv| {
-                last_pos.insert(snv.chrom.clone(), snv.pos);
-                (record, snv)
-            })
-        })
+        // Filter first as we need INFO field
+        .filter(|record| keep_variant(record, header, capture, &mut last_pos, spacing))
+        // The add chr prefilx
+        .map(|record| add_chr_prefix(&record))
         .sample(rng, n);
-    selected.sort_by(|(_, a), (_, b)| {
-        chrom_order(&a.chrom)
-            .cmp(&chrom_order(&b.chrom))
-            .then(a.pos.cmp(&b.pos))
-    });
-
+    sort_by_chromosome(&mut selected);
     log::debug!("Selected {} variants", selected.len());
     selected
+}
+
+fn sort_by_chromosome(variants: &mut Vec<RecordBuf>) {
+    variants.sort_by(|a, b| {
+        chrom_order(a.reference_sequence_name())
+            .cmp(&chrom_order(b.reference_sequence_name()))
+            .then_with(|| {
+                let ap = a.variant_start().map(usize::from).unwrap_or(0);
+                let bp = b.variant_start().map(usize::from).unwrap_or(0);
+                ap.cmp(&bp)
+            })
+    });
 }
 
 /// Select n clinvar pathogenic SNV inside the capture kit 50bp apart.
@@ -198,7 +211,7 @@ pub fn sample_clinvar(
     n: usize,
     vcf_out: PathBuf,
     mut_out: PathBuf,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<vcf::Header, Box<dyn Error>> {
     let vcf = download_clinvar();
 
     // Prepare VCF file
@@ -214,11 +227,12 @@ pub fn sample_clinvar(
     write_sampled_clinvar_vcf(&variants, &header, &vcf_out)?;
     write_sampled_clinvar_mut(&variants, &mut_out, &mut rng)?;
     log::debug!("Wrote {:?} and {:?}", vcf_out, mut_out);
-    Ok(())
+    Ok(header)
 }
 
+/// Assume there is no chr prefix for chromosome
 fn write_sampled_clinvar_vcf(
-    variants: &Vec<(vcf::Record, Snv)>,
+    variants: &Vec<RecordBuf>,
     header: &vcf::Header,
     vcf_out: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
@@ -227,14 +241,45 @@ fn write_sampled_clinvar_vcf(
         .map(vcf::io::Writer::new)?;
     writer.write_header(&header)?;
 
-    for (record, _) in variants {
-        writer.write_record(&header, record)?;
+    for record in variants {
+        writer.write_variant_record(header, record)?;
     }
     Ok(())
 }
 
+/// Write varben output as VCF successful insertions only, failures are not properly formatted,
+pub fn write_varben_as_vcf(
+    bam: &PathBuf,
+    header: vcf::Header,
+    outdir: PathBuf,
+    fasta: &PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    let varben_dir = outdir.join("varben");
+    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
+
+    let success_list = varben_dir.join("success_list.txt");
+    let success_vcf = outdir.join(format!("{bam_stem}_success.vcf.gz"));
+    write_varben_as_vcf_single(success_list, success_vcf, header, fasta)
+
+    // let fail_list = varben_dir.join("invalid_mutation.txt");
+    // let fail_vcf = outdir.join(format!("{bam_stem}_fail.vcf.gz"));
+    // write_varben_as_vcf_single(fail_list, fail_vcf, fasta)
+}
+
+/// Helper to write a .vcf.gz
+fn vcf_writer(
+    path: &PathBuf,
+    header: &vcf::Header,
+) -> Result<vcf::io::Writer<bgzf::io::Writer<File>>, Box<dyn Error>> {
+    let mut writer = File::create(path)
+        .map(bgzf::io::Writer::new)
+        .map(vcf::io::Writer::new)?;
+    writer.write_header(header)?;
+    Ok(writer)
+}
+
 fn write_sampled_clinvar_mut(
-    variants: &Vec<(vcf::Record, Snv)>,
+    variants: &Vec<RecordBuf>,
     mut_out: &PathBuf,
     rng: &mut impl RngExt,
 ) -> Result<(), Box<dyn Error>> {
@@ -242,45 +287,66 @@ fn write_sampled_clinvar_mut(
     let mut varben_w = BufWriter::new(File::create(&mut_out)?);
     writeln!(varben_w, "#chrom\tstart\tend\tAF\ttype\talt")?;
 
-    for (_, snv) in variants {
-        write_varben(&mut varben_w, snv, rng)?;
+    for v in variants {
+        write_varben(&mut varben_w, v, rng)?;
     }
     varben_w.flush()?;
     Ok(())
 }
-/// Do it for a single record
-/// Input VCF may use chr prefix, output will have `chr` prefix.
+
+/// We cannot edit a record directly, recreate it without INFO and sample.
+/// This is just for clinvar data for quick check
+fn add_chr_prefix(record: &vcf::Record) -> RecordBuf {
+    let chrom_raw = record.reference_sequence_name();
+    let chrom_nb = chrom_raw.strip_prefix("chr").unwrap_or(chrom_raw);
+
+    let alts: Vec<String> = record
+        .alternate_bases()
+        .iter()
+        .filter_map(|a| a.ok())
+        .map(|a| a.to_string())
+        .collect();
+
+    let mut builder = RecordBuf::builder()
+        .set_reference_sequence_name(format!("chr{}", chrom_nb))
+        .set_reference_bases(record.reference_bases().to_string())
+        .set_alternate_bases(AltBasesBuf::from(alts));
+
+    if let Some(Ok(pos)) = record.variant_start() {
+        builder = builder.set_variant_start(pos);
+    }
+
+    builder.build()
+}
+
+/// For varian in the capture file and SNV and not bening, save it for writing
+/// Update lats saved position (`last_pos)`
+/// Input VCF may use chr prefix
 fn keep_variant(
     record: &vcf::Record,
     header: &vcf::Header,
     capture: &BedIndex,
-    last_pos: &HashMap<String, u64>,
+    last_pos: &mut HashMap<String, u64>,
     spacing: u32,
-) -> Option<Snv> {
-    let chrom_raw = record.reference_sequence_name().to_string();
-    // Remove chr prefix if needed
-    let chrom_nb = chrom_raw.strip_prefix("chr").unwrap_or(&chrom_raw);
-    let chrom_chr = format!("chr{}", chrom_nb);
+) -> bool {
+    let Some(Ok(start)) = record.variant_start() else {
+        return false;
+    };
+    let pos = usize::from(start) as u64;
+    let chrom_raw = record.reference_sequence_name();
+    let chrom = chrom_raw.strip_prefix("chr").unwrap_or(chrom_raw);
+    let last = last_pos.get(chrom).copied().unwrap_or(0);
 
-    let pos = usize::from(record.variant_start()?.ok()?) as u64;
-    let last = last_pos.get(chrom_nb).copied().unwrap_or(0);
-    let alt = record
-        .alternate_bases()
-        .iter()
-        .filter_map(|a| a.ok())
-        .next()
-        .unwrap_or(".")
-        .to_string();
-    (in_capture(capture, &chrom_nb, pos)
+    let ok = in_capture(capture, chrom, pos)
         && is_not_benign(&record.info(), header)
         && is_snv(record)
         && pos != last
-        && pos.abs_diff(last) >= spacing.into())
-    .then_some(Snv {
-        chrom: chrom_chr,
-        pos,
-        alt,
-    })
+        && pos.abs_diff(last) >= spacing.into();
+
+    if ok {
+        last_pos.insert(chrom.to_string(), pos);
+    }
+    ok
 }
 
 /// Helper function to index a BAM file
@@ -375,8 +441,12 @@ pub fn edit_bam(
     // sample 1000 clinvar variant 50bp apart
     let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
-    sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
-    insert_variants(mut_out, bam_cleaned, fasta, outdir)
+    let header = sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
+    let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta)?;
+
+    write_varben_as_vcf(&bam, header, outdir, &fasta)?;
+
+    Ok(edited_bam)
 }
 
 /// Use varben (muteditor) to insert a list of variant in a bed files. Require varben, samtools, bwa
@@ -385,8 +455,8 @@ pub fn edit_bam(
 fn insert_variants(
     mut_file: PathBuf,
     bam: PathBuf,
-    fasta: PathBuf,
     outdir: PathBuf,
+    fasta: &PathBuf,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir_ = outdir.join("varben");
     std::fs::create_dir_all(&outdir_)?;
@@ -477,4 +547,60 @@ fn nb_threads() -> usize {
     thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(1)
+}
+
+/// Convert varben tabular data to a simple VCF.
+/// Require a fasta as varben only store alternative allel and not refercen
+fn write_varben_as_vcf_single(
+    mut_file: PathBuf,
+    vcf_out: PathBuf,
+    header: vcf::Header,
+    fasta: &PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    let mut fasta_reader = fasta::io::indexed_reader::Builder::default().build_from_path(fasta)?;
+
+    let reader = BufReader::new(File::open(mut_file)?);
+    let mut records: Vec<RecordBuf> = Vec::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with('#') {
+            continue;
+        }
+        let fields: Vec<&str> = line.splitn(6, '\t').collect();
+        if fields.len() < 6 {
+            continue;
+        }
+        let chrom = fields[0];
+        let pos: usize = fields[1].parse()?;
+        let alt = fields[5].trim();
+
+        let region: noodles::core::Region = format!("{}:{}-{}", chrom, pos, pos).parse()?;
+        let record = fasta_reader.query(&region)?;
+        let seq = record.sequence().as_ref();
+        let ref_base = std::str::from_utf8(&seq[..1])?.to_uppercase();
+
+        let buf = RecordBuf::builder()
+            .set_reference_sequence_name(chrom)
+            .set_variant_start(noodles::core::Position::try_from(pos)?)
+            .set_reference_bases(ref_base)
+            .set_alternate_bases(AltBasesBuf::from(vec![alt.to_string()]))
+            .build();
+
+        records.push(buf);
+    }
+
+    sort_by_chromosome(&mut records);
+
+    // let header = vcf::Header::default();
+    let mut writer = File::create(vcf_out.clone())
+        .map(bgzf::io::Writer::new)
+        .map(vcf::io::Writer::new)?;
+    writer.write_header(&header)?;
+    for rec in &records {
+        writer.write_variant_record(&header, rec)?;
+    }
+
+    log::debug!("Wrote {} variants to {:?}", records.len(), vcf_out);
+    Ok(())
 }
