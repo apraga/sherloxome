@@ -221,12 +221,22 @@ pub fn sample_clinvar(
         .map(bgzf::io::Reader::new)
         .map(vcf::io::Reader::new)?;
     let header = reader.read_header()?;
-    let mut rng = rand::rng();
-    let variants = sample_clinvar_variants(&mut reader, &header, &capture, spacing, n, &mut rng);
 
-    write_sampled_clinvar_vcf(&variants, &header, &vcf_out)?;
-    write_sampled_clinvar_mut(&variants, &mut_out, &mut rng)?;
-    log::debug!("Wrote {:?} and {:?}", vcf_out, mut_out);
+    if vcf_out.exists() && mut_out.exists() {
+        log::debug!(
+            "Skip sampling clinvar as output files already exists: {:?} and {:?}",
+            vcf_out,
+            mut_out
+        );
+    } else {
+        let mut rng = rand::rng();
+        let variants =
+            sample_clinvar_variants(&mut reader, &header, &capture, spacing, n, &mut rng);
+
+        write_sampled_clinvar_vcf(&variants, &header, &vcf_out)?;
+        write_sampled_clinvar_mut(&variants, &mut_out, &mut rng)?;
+        log::debug!("Wrote {:?} and {:?}", vcf_out, mut_out);
+    }
     Ok(header)
 }
 
@@ -260,23 +270,19 @@ pub fn write_varben_as_vcf(
     let success_list = varben_dir.join("success_list.txt");
     let success_vcf = outdir.join(format!("{bam_stem}_success.vcf.gz"));
     write_varben_as_vcf_single(success_list, success_vcf, header, fasta)
-
-    // let fail_list = varben_dir.join("invalid_mutation.txt");
-    // let fail_vcf = outdir.join(format!("{bam_stem}_fail.vcf.gz"));
-    // write_varben_as_vcf_single(fail_list, fail_vcf, fasta)
 }
 
 /// Helper to write a .vcf.gz
-fn vcf_writer(
-    path: &PathBuf,
-    header: &vcf::Header,
-) -> Result<vcf::io::Writer<bgzf::io::Writer<File>>, Box<dyn Error>> {
-    let mut writer = File::create(path)
-        .map(bgzf::io::Writer::new)
-        .map(vcf::io::Writer::new)?;
-    writer.write_header(header)?;
-    Ok(writer)
-}
+// fn vcf_writer(
+//     path: &PathBuf,
+//     header: &vcf::Header,
+// ) -> Result<vcf::io::Writer<bgzf::io::Writer<File>>, Box<dyn Error>> {
+//     let mut writer = File::create(path)
+//         .map(bgzf::io::Writer::new)
+//         .map(vcf::io::Writer::new)?;
+//     writer.write_header(header)?;
+//     Ok(writer)
+// }
 
 fn write_sampled_clinvar_mut(
     variants: &Vec<RecordBuf>,
