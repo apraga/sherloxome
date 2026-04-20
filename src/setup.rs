@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Configuration file for the user definig which GIAB data and which in silico data
 #[derive(Deserialize, Debug)]
@@ -34,7 +34,6 @@ pub struct Config {
 struct SilicoConfig {
     capture: Capture,
     // fastq: bool,
-    fasta: PathBuf,
     bam: Option<String>,
 }
 
@@ -150,10 +149,24 @@ fn generate_controls_bam(
     let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
 
-    log::info!("Editing BAM to insert control");
     let bam_path = resolve_bam(&bam, &outdir)?;
-    let new_bam = edit_bam(&bam_path, &bed, capture, fasta)?;
-    bam_to_fastq(new_bam, bam_path)
+    let bam_stem = bam_path.file_stem().unwrap().to_string_lossy();
+    let bam_parent = bam_path.parent().unwrap_or(Path::new("."));
+    let fq1 = bam_parent.join(format!("{bam_stem}_1.fq.gz"));
+    let fq2 = bam_parent.join(format!("{bam_stem}_2.fq.gz"));
+
+    if fq1.exists() && fq2.exists() {
+        log::info!(
+            "Skipping BAM editing as output fastq already exists {:?}, {:?}",
+            fq1,
+            fq2
+        );
+        Ok((fq1, fq2))
+    } else {
+        log::info!("Editing BAM to insert control");
+        let new_bam = edit_bam(&bam_path, &bed, capture, fasta)?;
+        bam_to_fastq(new_bam, fq1, fq2)
+    }
 }
 
 pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {

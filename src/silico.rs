@@ -13,7 +13,7 @@ use noodles::vcf::variant::record::info::field::Value;
 use noodles::vcf::variant::record_buf::AlternateBases as AltBasesBuf;
 use rand::RngExt;
 use rand::prelude::IteratorRandom;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufRead;
@@ -516,19 +516,7 @@ fn insert_variants_varben(
 }
 /// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
 /// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
-pub fn bam_to_fastq(bam: PathBuf, old_bam: PathBuf) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let stem = old_bam.file_stem().unwrap().to_string_lossy();
-    let parent = old_bam.parent().unwrap_or(Path::new("."));
-    let fq1 = parent.join(format!("{stem}_1.fq.gz"));
-    let fq2 = parent.join(format!("{stem}_2.fq.gz"));
-    if fq1.exists() && fq2.exists() {
-        log::debug!("Output fastq already exists");
-        Ok((fq1, fq2))
-    } else {
-        run_bam_to_fastq(bam, fq1, fq2)
-    }
-}
-pub fn run_bam_to_fastq(
+pub fn bam_to_fastq(
     bam: PathBuf,
     fq1: PathBuf,
     fq2: PathBuf,
