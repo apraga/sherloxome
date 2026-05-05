@@ -172,7 +172,7 @@ fn sample_clinvar_variants(
     header: &vcf::Header,
     capture: &BedIndex,
     spacing: u32,
-    n: usize,
+    n: u32,
     rng: &mut impl RngExt,
 ) -> Vec<RecordBuf> {
     let mut last_pos: HashMap<String, u64> = HashMap::new();
@@ -183,7 +183,10 @@ fn sample_clinvar_variants(
         .filter(|record| keep_variant(record, header, capture, &mut last_pos, spacing))
         // The add chr prefilx
         .map(|record| add_chr_prefix(&record))
-        .sample(rng, n);
+        .sample(
+            rng,
+            n.try_into().expect("Fails to convert nb variants to usize"),
+        );
     sort_by_chromosome(&mut selected);
     log::debug!("Selected {} variants", selected.len());
     selected
@@ -202,22 +205,19 @@ fn sort_by_chromosome(variants: &mut Vec<RecordBuf>) {
 }
 
 /// Select n clinvar pathogenic SNV inside the capture kit 50bp apart.
-/// Output is both a mutation file for varben and a VCF (hardocoded into data/exp_raw/clinvar_$CAPTURE)
-/// The most efficient way is to parse clinvar once to get variant in the capture kit and 50pb apart.
-/// In a second pass, sample randomly n of theme
+/// Output is both a mutation file for varben and a VCF (hardcoded into data/exp_raw/clinvar_$CAPTURE)
+/// The most efficient way is to parse clinvar once to get variant in the capture kit and 50bp apart.
+/// In a second pass, sample randomly n of them.
 pub fn sample_clinvar(
+    clinvar_vcf: PathBuf,
     bed: PathBuf,
     spacing: u32,
-    n: usize,
+    n: u32,
     vcf_out: PathBuf,
     mut_out: PathBuf,
 ) -> Result<vcf::Header, Box<dyn Error>> {
-    let vcf = download_clinvar();
-
-    // Prepare VCF file
-    // Load BED into interval tree per chrom
     let capture = load_bed(&bed)?;
-    let mut reader = File::open(vcf)
+    let mut reader = File::open(&clinvar_vcf)
         .map(bgzf::io::Reader::new)
         .map(vcf::io::Reader::new)?;
     let header = reader.read_header()?;
@@ -431,26 +431,48 @@ fn download_bam(url: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> 
 /// Generate controls from clinvar variant into a BAM file
 /// 1. Sample clinvar randomly
 /// 2. Generate mutation files from those clinvar variant for varben
-/// 2. Apply varben on a single bam file
+/// 3. Apply varben on a single bam file
+///
+/// If `clinvar_vcf` is None the file is downloaded from NCBI and stored in `outdir`.
 pub fn edit_bam(
     bam: &PathBuf,
     bed: &PathBuf,
     capture: &str,
     fasta: PathBuf,
+    clinvar_vcf: Option<PathBuf>,
+    nb_variants: Option<u32>,
+    outdir: PathBuf,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
 
-    index_bam(&bam)?;
-    let bam_cleaned = remove_hard_clips(&bam)?;
+    index_bam(bam)?;
+    let bam_cleaned = remove_hard_clips(bam)?;
 
-    // sample 1000 clinvar variant 50bp apart
+    let clinvar_path = match clinvar_vcf {
+        Some(p) => p,
+        None => download_clinvar(),
+    };
+
+    let n = match nb_variants {
+        Some(n) => n,
+        None => 1000,
+    };
+    log::debug!("Sampling {n} variants for insertion");
+
+    // sample n clinvar variants 50bp apart
     let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
-    let header = sample_clinvar(PathBuf::from(bed), 50, 1000, vcf_out, mut_out.clone())?;
+    let header = sample_clinvar(
+        clinvar_path,
+        PathBuf::from(bed),
+        50,
+        n,
+        vcf_out,
+        mut_out.clone(),
+    )?;
     let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta)?;
 
-    write_varben_as_vcf(&bam, header, outdir, &fasta)?;
+    write_varben_as_vcf(bam, header, outdir, &fasta)?;
 
     Ok(edited_bam)
 }

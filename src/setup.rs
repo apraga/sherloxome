@@ -33,8 +33,13 @@ pub struct Config {
 #[derive(Deserialize, Debug)]
 struct SilicoConfig {
     capture: Capture,
-    // fastq: bool,
     bam: Option<String>,
+    /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
+    clinvar: Option<PathBuf>,
+    /// Number of clinvar variants to sample to insert in the BAM
+    nb_variants: Option<u32>,
+    /// Output directory for intermediate files; defaults to "data/exp_raw".
+    outdir: Option<PathBuf>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -129,12 +134,25 @@ fn generate_controls(
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
     check_controls_deps();
 
+    let outdir = silico
+        .outdir
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("data/exp_raw"));
+
     let mut rows: Vec<SamplesheetRow> = Vec::new();
     if let Some(bam) = &silico.bam {
-        let (fq1, fq2) = generate_controls_bam(&bam, bed, capture, fasta)?;
+        let (fq1, fq2) = generate_controls_bam(
+            bam,
+            bed,
+            capture,
+            fasta,
+            silico.clinvar.clone(),
+            silico.nb_variants,
+            outdir,
+        )?;
         rows.push(silico_row("varben", fq1, fq2));
     } else {
-        return Err("FASTQ generetion not implemented".into());
+        return Err("FASTQ generation not implemented".into());
     }
     Ok(rows)
 }
@@ -145,11 +163,13 @@ fn generate_controls_bam(
     bed: PathBuf,
     capture: &str,
     fasta: PathBuf,
+    clinvar: Option<PathBuf>,
+    nb_variants: Option<u32>,
+    outdir: PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
 
-    let bam_path = resolve_bam(&bam, &outdir)?;
+    let bam_path = resolve_bam(bam, &outdir)?;
     let bam_stem = bam_path.file_stem().unwrap().to_string_lossy();
     let bam_parent = bam_path.parent().unwrap_or(Path::new("."));
     let fq1 = bam_parent.join(format!("{bam_stem}_1.fq.gz"));
@@ -164,7 +184,15 @@ fn generate_controls_bam(
         Ok((fq1, fq2))
     } else {
         log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(&bam_path, &bed, capture, fasta)?;
+        let new_bam = edit_bam(
+            &bam_path,
+            &bed,
+            capture,
+            fasta,
+            clinvar,
+            nb_variants,
+            outdir,
+        )?;
         bam_to_fastq(new_bam, fq1, fq2)
     }
 }
