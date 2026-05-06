@@ -1,28 +1,25 @@
 doc/book
+*.vcf.gz
+*.tbi
+*.fq.gz
 silico
 target/
 scripts/compare-exome/giab-*
 baid2020
 giab
-*.gz
-*.gz.tbi
-.nextflow*
-work
-*.bam
 data/exp_raw/varben
 test
 work
 data/ref/GCA*
-*.mut
-*.bai
-.nextflow.log
+.nextflow.log*
 silico
 GCA*.fna
 GCA*.fna.*
 .nextflow*
 work
-*.bam
-*.bam.bai
+# *.bam
+# *.bai
 *.mut
-.nextflow.log*
 test*
+HG002.chr21-hiseq4000-agilent-50x.bam
+HG002.chr21-hiseq4000-agilent-50x_nohardclip.bam
