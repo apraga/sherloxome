@@ -1,15 +1,8 @@
 doc/book
-
 target/
-
 scripts/compare-exome/giab-*
 baid2020
 giab
-
-
-# Added by cargo
-
-/target
 *.gz
 *.gz.tbi
 .nextflow*
@@ -22,3 +15,6 @@ data/ref/GCA*
 *.mut
 *.bai
 .nextflow.log
+silico
+*.fna
+*.fna.*

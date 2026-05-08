@@ -1,6 +1,7 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
 use crate::download_blocking;
+use flate2::read::GzDecoder;
 use log;
 use noodles::bed;
 use noodles::bgzf;
@@ -219,7 +220,8 @@ pub fn sample_clinvar(
     let capture = load_bed(&bed)?;
     let mut reader = File::open(&clinvar_vcf)
         .map(bgzf::io::Reader::new)
-        .map(vcf::io::Reader::new)?;
+        .map(vcf::io::Reader::new)
+        .expect("Failed to open clinvar file");
     let header = reader.read_header()?;
 
     if vcf_out.exists() && mut_out.exists() {
@@ -229,6 +231,7 @@ pub fn sample_clinvar(
             mut_out
         );
     } else {
+        log::debug!("Sampling {n} variants for insertion");
         let mut rng = rand::rng();
         let variants =
             sample_clinvar_variants(&mut reader, &header, &capture, spacing, n, &mut rng);
@@ -402,6 +405,39 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     Ok(filtered)
 }
 
+/// Check if fasta file exists. If not, download GRCh38 full analysis set from NCBI and unzip it.
+pub fn resolve_fasta(fasta: &PathBuf) -> PathBuf {
+    if fasta.exists() {
+        return fasta.clone();
+    }
+    log::debug!(
+        "{:?} not found, downloading GRCh38 reference from NCBI...",
+        fasta
+    );
+    let fasta_gz_dist = "GCA_000001405.15_GRCh38_full_analysis_set.fna.gz";
+    let fasta_dist = "GCA_000001405.15_GRCh38_full_analysis_set.fna";
+    let fai_dist = "GCA_000001405.15_GRCh38_full_analysis_set.fna.fai";
+    let root_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.26_GRCh38/GRCh38_major_release_seqs_for_alignment_pipelines";
+
+    let gz_path = PathBuf::from("data/ref").join(fasta_gz_dist);
+    let fai_path = PathBuf::from("data/ref").join(fai_dist);
+    let fasta_path = PathBuf::from("data/ref").join(fasta_dist);
+
+    if !fasta_path.exists() {
+        let url = format!("{root_url}/{fasta_gz_dist}");
+        download_blocking(&url, &gz_path);
+        log::debug!("Decompressing {:?}...", gz_path);
+        let gz_file = std::fs::File::open(&gz_path).expect("Failed to open gz file");
+        let mut decoder = GzDecoder::new(gz_file);
+        let mut out_file =
+            std::fs::File::create(&fasta_path).expect("Failed to create decompressed fasta");
+        std::io::copy(&mut decoder, &mut out_file).expect("Failed to decompress fasta");
+    }
+    let url = format!("{root_url}/{fai_dist}");
+    download_blocking(&url, &fai_path);
+    fasta_path
+}
+
 /// Download a bam file if it's an url, otherwise check the file exist
 pub fn resolve_bam(bam: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     if bam.starts_with("http://") || bam.starts_with("https://") {
@@ -457,7 +493,6 @@ pub fn edit_bam(
         Some(n) => n,
         None => 1000,
     };
-    log::debug!("Sampling {n} variants for insertion");
 
     // sample n clinvar variants 50bp apart
     let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));

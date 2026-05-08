@@ -10,7 +10,7 @@ use crate::download_blocking;
 use crate::fastqbaid2020::{Capture, Depth, Run, Sequencer};
 use crate::fastqbaid2020::{available, real_row};
 use crate::giab::{Patient, bed_url, vcf_url};
-use crate::giab::{all_patients, bed_file, vcf_file};
+use crate::giab::{bed_file, vcf_file};
 use crate::silico::*;
 use itertools::iproduct;
 // use polars::io::resolve_homedir;
@@ -109,11 +109,12 @@ fn filter_available_runs(real: &RealConfig) -> HashSet<Run> {
     runs
 }
 
-/// Download all reference VCF and BED in a directory.
-fn download_giab_refs() {
+/// Download reference VCF and BED for the patients present in the given runs.
+fn download_giab_runs(runs: &HashSet<Run>) {
     let out_dir = PathBuf::from("data/ref");
     std::fs::create_dir_all(&out_dir).expect("Could not create directory");
-    for p in all_patients() {
+    let patients: HashSet<Patient> = runs.iter().map(|r| r.patient).collect();
+    for p in patients {
         println!("{:?}", p);
         let mut vcf = out_dir.clone().join(vcf_file(&p));
         let bed = out_dir.clone().join(bed_file(&p));
@@ -204,18 +205,21 @@ pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
     }
 
     if let Some(real) = &conf.real {
-        download_giab_refs();
+        log::debug!("Real patients selected");
         let runs = filter_available_runs(real);
+        download_giab_runs(&runs);
         rows.extend(runs.iter().map(real_row));
     }
 
     if let Some(silico) = &conf.silico {
+        log::debug!("Silico patients selected");
         let capture_str = &silico.capture.to_string();
         let bed = conf
             .capture
             .get(capture_str)
             .ok_or("no BED for silico capture")?;
-        let rows_silico = generate_controls(silico, PathBuf::from(bed), capture_str, conf.fasta)?;
+        let fasta = resolve_fasta(&conf.fasta);
+        let rows_silico = generate_controls(silico, PathBuf::from(bed), capture_str, fasta)?;
         rows.extend(rows_silico);
     }
     write_samplesheet(rows)?;
