@@ -1,39 +1,85 @@
-# TODO Evaluate performance
+# Evaluate performance
 
-## For reference patients
-In `scripts/compare` will get all the HG***.vcf.gz in a directory, match them against reference patients using gold vcf and bed dataset.
-It also needs capture kits in `baid2020/bed`
+## Run hap.py analysis
 
-Usage : 
+After variant calling, benchmark the output VCFs against GIAB truth sets:
 
-    cd scripts/compare
-    cargo run -p compare -- -d VCFDIRECTORY -o OUTDIRECTORY
-
-Ex: 
-
-    cd scripts/compare
-    cargo run -p compare -- -d ../../../bisonex/out/preprocessing/markduplicates/ -o bisonex-giab
-
-Example of a slurm file (needs `cargo build --release` to be run beforehand)
-
-```slurm
-
-#!/bin/bash -l
-# Fichier submission.SBATCH
-
-#SBATCH --job-name="compare-exome-baid2020"
-#SBATCH --output=%x.%J.out   ## %x=job name, %J=job id
-#SBATCH --error=%x.%J.out
- # walltime (hh:mm::ss) max is 8 days
-#SBATCH -t 4:00:00
-#SBATCH --partition=smp
-#SBATCH -c 6  ## request 16 cores (MAX is 32)
-#SBATCH --mem=12G ## (MAX is 96G)
-
-module load nix/2.11.0
-cargo run -p compare --  -d ../../baid2020/grch38/vcf -o giab-baid2020
+```bash
+sherloxome analyze \
+    -i data/exp_raw/giab \
+    -o data/analysis \
+    -c config.toml
 ```
 
-## TODO For synthetic patient
-## TODO For synthetic data
+| Flag | Description |
+|------|-------------|
+| `-i` / `--input` | Directory to search recursively for `**/*.vcf.gz` |
+| `-o` / `--output` | Output directory for hap.py summaries and `merged.csv` |
+| `-c` / `--config` | Config file (needed for capture BED paths; default `config.toml`) |
 
+## What `analyze` does
+
+For each VCF whose filename contains recognisable run metadata (patient, sequencer, capture, depth):
+
+1. Locates the GIAB truth VCF and high-confidence BED in `data/ref/`
+2. Locates the capture kit BED from `[capture]` in `config.toml`
+3. Generates an RTG SDF from the reference FASTA on first run (`rtg format`)
+4. Runs `hap.py` with the `vcfeval` engine (single-threaded per run; VCFs are processed in parallel)
+5. Writes per-run hap.py summaries to the output directory
+6. Merges all summaries into `merged.csv`, adding `patient`, `capture`, `sequencer`, `depth` columns
+
+## Output files
+
+```
+data/analysis/
+├── HG001-agilent-hiseq4000-50x.summary.csv
+├── HG002-agilent-novaseq-75x.summary.csv
+├── ...
+└── merged.csv
+```
+
+`merged.csv` is the input to the `plot` step.
+
+## Prerequisites
+
+- GIAB truth VCFs in `data/ref/` (written by `sherloxome setup`)
+- The GRCh38 reference FASTA specified in `config.toml`
+- `hap.py` and `rtg` in `PATH`
+
+## Restart safety
+
+Any run for which a `.summary.csv` already exists in the output directory is skipped. You can safely re-run `analyze` after adding new VCFs without reprocessing existing results.
+
+## Visualising results
+
+Once `merged.csv` exists, open an interactive boxplot:
+
+```bash
+sherloxome plot -i data/analysis/merged.csv
+```
+
+The chart shows F1-score distributions broken down by:
+
+- Patient (HG001–HG007)
+- Capture kit (Agilent, IDT, TruSeq)
+- Sequencer (HiSeq4000, NovaSeq)
+- Depth (50x, 75x, 100x)
+
+Only `PASS` variants are included in the plot.
+
+## SLURM example
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=analyze
+#SBATCH --output=%x.%J.out
+#SBATCH --time=4:00:00
+#SBATCH --partition=smp
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=12G
+
+sherloxome analyze \
+    -i data/exp_raw/giab \
+    -o data/analysis \
+    -c config.toml
+```
