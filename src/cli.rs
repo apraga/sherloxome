@@ -1,3 +1,9 @@
+//! Command-line interface.
+//!
+//! Three subcommands:
+//! - `setup`   — download GIAB data and generate in silico controls
+//! - `analyze` — run hap.py over pipeline output VCFs
+//! - `plot`    — display F1-score boxplots from `merged.csv`
 use crate::analyze::analyze;
 use crate::plot::plot;
 use crate::setup::{Config, setup};

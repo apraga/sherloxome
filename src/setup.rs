@@ -1,10 +1,11 @@
-//! Setup data before the pipeline.
-//!  Each step is optional:
+//! Setup data before the pipeline for either real patients or insilico data:
 //! - download all reference FASTQ for real patients and BED in a directory.
-//! - generate in silico FASTQ from clinvar data
+//! - generate in silico FASTQ from clinvar data [`crate::silico`]
 //!   - insert variants into a real BAM
 //!   - generate FASTQ directly from a list of variants (simuscop)
-//! And generate a samplesheet for sarek
+//! - generate a samplesheet for sarek.
+//!
+//! At least one configuration should be set (real patients or insilico data)
 
 use crate::download_blocking;
 use crate::fastqbaid2020::{Capture, Depth, Run, Sequencer};
@@ -58,6 +59,7 @@ pub struct SamplesheetRow {
     pub fastq_2: String,
 }
 
+/// Write all rows to `samplesheet.csv` in the current directory.
 fn write_samplesheet(rows: Vec<SamplesheetRow>) -> Result<(), Box<dyn Error>> {
     let mut file = File::create("samplesheet.csv")?;
     writeln!(file, "patient,sample,lane,fastq_1,fastq_2")?;
@@ -198,6 +200,10 @@ fn generate_controls_bam(
     }
 }
 
+/// Main entry point for the `setup` subcommand.
+///
+/// Depending on what is present in `conf`, downloads GIAB data and/or generates
+/// in silico controls, then writes `samplesheet.csv`.
 pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
     let mut rows: Vec<SamplesheetRow> = Vec::new();
     if conf.real.is_none() && conf.silico.is_none() {
@@ -226,6 +232,7 @@ pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Build a samplesheet row for an in silico sample.
 fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetRow {
     let fq1_str = fq1
         .clone()

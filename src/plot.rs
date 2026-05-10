@@ -1,9 +1,15 @@
+//! Visualise benchmarking results as interactive Vega-Lite boxplots.
+//!
+//! Reads the `merged.csv` produced by [`crate::analyze`] and opens a browser window
+//! showing F1-score distributions broken down by patient, sequencer, depth, and capture kit.
+
 // Column indices in merged.csv:
 // 0=Type, 1=Filter, 13=METRIC.F1_Score, 18=patient, 19=capture, 20=sequencer, 21=depth
 
 use std::path::PathBuf;
 use vega_lite_4::*;
 
+/// Build one horizontal row of the faceted boxplot for a given factor column index.
 fn make_row(
     factor_idx: &str,
     show_column_labels: bool,
@@ -61,6 +67,7 @@ fn make_row(
         .build()?)
 }
 
+/// Read `merged.csv` and open a browser with F1-score boxplots faceted by variant type.
 pub fn plot(input: PathBuf, _output: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let chart = VegaliteBuilder::default()
         .data(csv::Reader::from_path(&input)?)

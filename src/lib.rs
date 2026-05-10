@@ -1,3 +1,8 @@
+//! Exome variant-calling benchmarking toolkit.
+//!
+//! 1. Download GIAB reference VCFs/BEDs and prepare FASTQ data for either real-patient or in silico control, then generates a samplesheet for sarek ([`setup`])
+//! 2. Benchmark pipeline output VCFs against GIAB truth sets with hap.py ([`analyze`])
+//! 3. Visualise performances metrics ([`plot`])
 pub mod analyze;
 use std::time::Duration;
 pub mod cli;

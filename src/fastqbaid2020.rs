@@ -43,6 +43,7 @@ impl fmt::Display for Capture {
     }
 }
 
+/// All supported capture kits.
 pub fn all_captures() -> Vec<Capture> {
     [Capture::Agilent, Capture::Idt, Capture::Truseq].to_vec()
 }
@@ -65,6 +66,7 @@ impl fmt::Display for Sequencer {
     }
 }
 
+/// All supported sequencer types.
 pub fn all_sequencers() -> Vec<Sequencer> {
     [Sequencer::Hiseq4000, Sequencer::Novaseq].to_vec()
 }
@@ -90,6 +92,7 @@ impl fmt::Display for Depth {
         write!(f, "{s}")
     }
 }
+/// All supported sequencing depths.
 pub fn all_depths() -> Vec<Depth> {
     [Depth::DP50, Depth::DP75, Depth::DP100].to_vec()
 }
@@ -570,6 +573,7 @@ pub fn capture() -> Vec<Capture> {
     [Capture::Agilent, Capture::Idt, Capture::Truseq].to_vec()
 }
 
+/// Build a samplesheet row for a real GIAB run with GCS FASTQ URLs.
 pub fn real_row(run: &Run) -> SamplesheetRow {
     let sample = format!(
         "{:}-{:}-{:}-{:}",
@@ -598,6 +602,7 @@ pub fn url(run: Run, lane: &str) -> String {
     format!("{}.{}.fastq.gz", root, lane)
 }
 
+/// Infer a [`Run`] from a file path by matching patient, capture, sequencer, and depth strings.
 pub fn run_from_filename(fname: &PathBuf) -> Option<Run> {
     let name = fname.to_string_lossy();
     let patient = patient_from_filename(fname);

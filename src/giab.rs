@@ -74,6 +74,7 @@ pub fn bed_url(p: &Patient) -> String {
     format!("{BASE_URL}/{}/{}", url_tail(p), bed_file(p))
 }
 
+/// Infer the GIAB [`Patient`] from a file path by matching its string representation.
 pub fn patient_from_filename(fname: &PathBuf) -> Option<Patient> {
     let name = fname.to_string_lossy();
     all_patients()

@@ -1,3 +1,7 @@
+//! Benchmark variant-called VCFs against GIAB truth sets using hap.py.
+//!
+//! Run metadata (patient, sequencer, capture kit, depth) is extracted from VCF filenames,
+//! so files must be named using the conventions established in [`crate::fastqbaid2020`].
 use crate::fastqbaid2020::{Run, run_from_filename};
 use crate::giab;
 use glob::glob;
@@ -9,8 +13,6 @@ use std::error::Error;
 use std::fs::create_dir_all;
 use std::path::PathBuf;
 use std::process::Command;
-
-///! Analyze all VCF in a directory with happy by comparing to reference VCF
 
 /// From a directory, list all VCFs matching runs information, call happy on each VCF
 /// merge the results.

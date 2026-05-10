@@ -28,6 +28,7 @@ use std::thread;
 use url::Url;
 use which::which;
 
+/// Panic if `bwa`, `samtools`, or `muteditor` are not found in `PATH`.
 pub fn check_controls_deps() {
     let tools = ["bwa", "samtools", "muteditor"];
 
@@ -405,6 +406,30 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     Ok(filtered)
 }
 
+/// Download and extract the pre-built BWA index from NCBI if absent.
+pub fn ensure_bwa_index(fasta: &PathBuf) -> Result<(), Box<dyn Error>> {
+    let bwt = PathBuf::from(format!("{}.bwt", fasta.display()));
+    if bwt.exists() {
+        log::debug!("BWA index already exists");
+        return Ok(());
+    }
+    let tar_name = "GCA_000001405.15_GRCh38_full_analysis_set.fna.bwa_index.tar.gz";
+    let root_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.26_GRCh38/GRCh38_major_release_seqs_for_alignment_pipelines";
+    let url = format!("{root_url}/{tar_name}");
+    let ref_dir = PathBuf::from("data/ref");
+    let tar_path = ref_dir.join(tar_name);
+    log::debug!("Downloading BWA index...");
+    download_blocking(&url, &tar_path);
+    log::debug!("Extracting BWA index...");
+    let status = Command::new("tar")
+        .args(["-xzf", tar_path.to_str().ok_or("Invalid tar path")?, "-C", ref_dir.to_str().ok_or("Invalid ref dir")?])
+        .status()?;
+    if !status.success() {
+        return Err(format!("tar exited with status {status}").into());
+    }
+    Ok(())
+}
+
 /// Check if fasta file exists. If not, download GRCh38 full analysis set from NCBI and unzip it.
 pub fn resolve_fasta(fasta: &PathBuf) -> PathBuf {
     if fasta.exists() {
@@ -505,6 +530,7 @@ pub fn edit_bam(
         vcf_out,
         mut_out.clone(),
     )?;
+    ensure_bwa_index(&fasta)?;
     let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta)?;
 
     write_varben_as_vcf(bam, header, outdir, &fasta)?;
