@@ -6,6 +6,7 @@
 //! - `plot`    — display F1-score boxplots from `merged.csv`
 use crate::analyze::analyze;
 use crate::plot::plot;
+use crate::resolve_fasta;
 use crate::setup::{Config, setup};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;

@@ -4,6 +4,7 @@
 //! so files must be named using the conventions established in [`crate::fastqbaid2020`].
 use crate::fastqbaid2020::{Run, run_from_filename};
 use crate::giab;
+use crate::resolve_fasta;
 use glob::glob;
 use polars::lazy::prelude::*;
 use polars::prelude::*;
@@ -18,13 +19,14 @@ use std::process::Command;
 /// merge the results.
 /// If there's an error in a VCF analysis, print a message and skip to the next
 pub fn analyze(
-    fasta: &PathBuf,
+    fasta: &str,
     capture: HashMap<String, String>,
     input_dir: PathBuf,
     output_dir: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     create_dir_all(&output_dir)?;
-    analyze_happy(fasta, capture, input_dir, &output_dir)?;
+    let fasta_path = resolve_fasta(fasta)?;
+    analyze_happy(&fasta_path, capture, input_dir, &output_dir)?;
     merge_summaries(output_dir)?;
     Ok(())
 }
@@ -72,17 +74,15 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
         .map(|path| -> Result<LazyFrame, Box<dyn Error>> {
             let run =
                 run_from_filename(&path).ok_or("Failed to extract run from summary filename")?;
-            Ok(
-                CsvReadOptions::default()
-                    .with_has_header(true)
-                    .try_into_reader_with_file_path(Some(path))?
-                    .finish()?
-                    .lazy()
-                    .with_column(lit(run.patient.to_string()).alias("patient"))
-                    .with_column(lit(run.capture.to_string()).alias("capture"))
-                    .with_column(lit(run.sequencer.to_string()).alias("sequencer"))
-                    .with_column(lit(run.depth.to_string()).alias("depth")),
-            )
+            Ok(CsvReadOptions::default()
+                .with_has_header(true)
+                .try_into_reader_with_file_path(Some(path))?
+                .finish()?
+                .lazy()
+                .with_column(lit(run.patient.to_string()).alias("patient"))
+                .with_column(lit(run.capture.to_string()).alias("capture"))
+                .with_column(lit(run.sequencer.to_string()).alias("sequencer"))
+                .with_column(lit(run.depth.to_string()).alias("depth")))
         })
         .collect::<Result<_, _>>()?;
 

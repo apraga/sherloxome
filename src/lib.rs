@@ -4,8 +4,11 @@
 //! 2. Benchmark pipeline output VCFs against GIAB truth sets with hap.py ([`analyze`])
 //! 3. Visualise performances metrics ([`plot`])
 pub mod analyze;
+use flate2::read::GzDecoder;
 use std::time::Duration;
+use url::Url;
 pub mod cli;
+use std::error::Error;
 pub mod fastqbaid2020;
 pub mod giab;
 pub mod plot;
@@ -38,4 +41,73 @@ fn download_blocking(url: &str, out: &PathBuf) {
             .expect(&format!("Failed to write to {out:?}"));
         log::debug!("Downloaded to {:?}", out);
     }
+}
+
+/// Check if fasta file exists. If not, download GRCh38 full analysis set from NCBI and unzip it.
+pub fn resolve_fasta(fasta: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let fasta_path = PathBuf::from(fasta);
+    let outdir = PathBuf::from("data/ref");
+    if fasta.starts_with("http://") || fasta.starts_with("https://") {
+        download_file(fasta, &outdir)
+    } else if fasta_path.exists() {
+        Ok(fasta_path)
+    } else {
+        log::debug!(
+            "{:?} not found, downloading GRCh38 reference from NCBI...",
+            fasta
+        );
+        download_fasta(outdir)
+    }
+}
+
+fn download_fasta(outdir: PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+    let fasta_gz_dist = "GCA_000001405.15_GRCh38_full_analysis_set.fna.gz";
+    let fasta_dist = "GCA_000001405.15_GRCh38_full_analysis_set.fna";
+    let fai_dist = "GCA_000001405.15_GRCh38_full_analysis_set.fna.fai";
+    let root_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.26_GRCh38/GRCh38_major_release_seqs_for_alignment_pipelines";
+
+    let gz_path = outdir.join(fasta_gz_dist);
+    let fai_path = outdir.join(fai_dist);
+    let fasta_path = outdir.join(fasta_dist);
+
+    if !fasta_path.exists() {
+        let url = format!("{root_url}/{fasta_gz_dist}");
+        download_blocking(&url, &gz_path);
+        log::debug!("Decompressing {:?}...", gz_path);
+        let gz_file = std::fs::File::open(&gz_path).expect("Failed to open gz file");
+        let mut decoder = GzDecoder::new(gz_file);
+        let mut out_file =
+            std::fs::File::create(&fasta_path).expect("Failed to create decompressed fasta");
+        std::io::copy(&mut decoder, &mut out_file).expect("Failed to decompress fasta");
+    }
+    let url = format!("{root_url}/{fai_dist}");
+    download_blocking(&url, &fai_path);
+    Ok(fasta_path)
+}
+
+/// Download a bam file if it's an url, otherwise check the file exist
+pub fn resolve_bam(bam: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+    if bam.starts_with("http://") || bam.starts_with("https://") {
+        download_file(bam, outdir)
+    } else {
+        let path = PathBuf::from(bam);
+        if !path.exists() {
+            return Err(format!("BAM file not found: {}", path.display()).into());
+        }
+        Ok(path)
+    }
+}
+
+fn download_file(url: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+    let parsed = Url::parse(&url)?;
+    log::info!("Downloading file {}", url);
+    let filename = parsed
+        .path_segments()
+        .and_then(|s| s.last())
+        .filter(|s| !s.is_empty())
+        .ok_or("could not extract filename from URL")?;
+
+    let output = outdir.join(filename);
+    download_blocking(&url, &output);
+    Ok(output)
 }

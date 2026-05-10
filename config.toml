@@ -8,21 +8,20 @@ captures = ["agilent"] #, "idt", "truseq"]
 sequencers = ["hiseq4000", "novaseq"]
 
 # Insert controls into a single patient BAM or generate in-silico fastq
+# Output will be in data/exp_raw
 [silico]
 capture = "agilent"
 # Generate a fastq fully in silico
 fastq = true
 # Either an URL or a local link to insert variants in a BAM file
-bam = "https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam"
+bam = "./data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.chr21.bam"
 # Required for generating a bam file
 # VCF containing clinvar variants. If not set, the VCF will be downloaded from NCBI
-clinvar = "./data/exp_raw/clinvar_agilent.vcf.gz"
+clinvar = "./data/exp_raw/clinvar_chr21.vcf.gz"
 # Number of random clinvar variants to insert into the BAM file. Default is 1000
 nb_variants = 2
-# Csutom fasta, otherwise download it from NCBI
-fasta = "/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full_analysis_set.fna"
-outdir = "silico"
-
+# URL to fasta, or link to local version, otherwise download it from NCBI
+fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
 
 # Define here the name of the capture (used in the filename) and the bed file
 [capture]

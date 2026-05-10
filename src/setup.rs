@@ -13,6 +13,7 @@ use crate::fastqbaid2020::{available, real_row};
 use crate::giab::{Patient, bed_url, vcf_url};
 use crate::giab::{bed_file, vcf_file};
 use crate::silico::*;
+use crate::{resolve_bam, resolve_fasta};
 use itertools::iproduct;
 // use polars::io::resolve_homedir;
 use serde::Deserialize;
@@ -25,7 +26,7 @@ use std::path::{Path, PathBuf};
 /// Configuration file for the user definig which GIAB data and which in silico data
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    pub fasta: PathBuf,
+    pub fasta: String,
     real: Option<RealConfig>,
     silico: Option<SilicoConfig>,
     pub capture: HashMap<String, String>,
@@ -187,15 +188,7 @@ fn generate_controls_bam(
         Ok((fq1, fq2))
     } else {
         log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(
-            &bam_path,
-            &bed,
-            capture,
-            fasta,
-            clinvar,
-            nb_variants,
-            outdir,
-        )?;
+        let new_bam = edit_bam(&bam_path, &bed, capture, fasta, clinvar, nb_variants)?;
         bam_to_fastq(new_bam, fq1, fq2)
     }
 }
@@ -224,7 +217,7 @@ pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
             .capture
             .get(capture_str)
             .ok_or("no BED for silico capture")?;
-        let fasta = resolve_fasta(&conf.fasta);
+        let fasta = resolve_fasta(&conf.fasta)?;
         let rows_silico = generate_controls(silico, PathBuf::from(bed), capture_str, fasta)?;
         rows.extend(rows_silico);
     }

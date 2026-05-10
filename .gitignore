@@ -17,5 +17,11 @@ data/ref/GCA*
 *.bai
 .nextflow.log
 silico
-*.fna
-*.fna.*
+GCA*.fna
+GCA*.fna.*
+.nextflow*
+work
+*.bam
+*.bam.bai
+*.mut
+varben

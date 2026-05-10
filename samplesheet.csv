@@ -1,2 +1,2 @@
 patient,sample,lane,fastq_1,fastq_2
-silico-varben,HG002.hiseq4000.wes-agilent.50x.dedup.grch38,1,silico/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_1.fq.gz,silico/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_2.fq.gz
+silico-varben,HG002.hiseq4000.wes-agilent.50x.dedup.grch38.chr21,1,./data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.chr21_1.fq.gz,./data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.chr21_2.fq.gz
