@@ -15,6 +15,7 @@
                 varben = pkgs.callPackage pkgs/varben.nix {};
                 simuscop = pkgs.callPackage pkgs/simuscop.nix {};
                 bwa = pkgs.bwa;
+                rtg = pkgs.rtg-tools;
                 hap-py = pkgs.hap-py;
                 samtools = pkgs.samtools;
             };

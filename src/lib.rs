@@ -1,21 +1,23 @@
 //! Exome variant-calling benchmarking toolkit.
 //!
 //! 1. Download GIAB reference VCFs/BEDs and prepare FASTQ data for either real-patient or in silico control, then generates a samplesheet for sarek ([`setup`])
-//! 2. Benchmark pipeline output VCFs against GIAB truth sets with hap.py ([`analyze`])
+//! 2. Benchmark pipeline output VCFs against GIAB truth sets with hap.py ([`benchmark`])
 //! 3. Visualise performances metrics ([`plot`])
-pub mod analyze;
+pub mod benchmark;
+pub mod run;
 use flate2::read::GzDecoder;
 use std::time::Duration;
 use url::Url;
 pub mod cli;
 use std::error::Error;
-pub mod fastqbaid2020;
+pub mod baid2020;
 pub mod giab;
 pub mod plot;
 pub mod setup;
 pub mod silico;
 use log;
 use std::path::PathBuf;
+use which::which;
 
 /// Helper to download a single URL. Assume the output directory exist
 fn download_blocking(url: &str, out: &PathBuf) {
@@ -110,4 +112,23 @@ fn download_file(url: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>>
     let output = outdir.join(filename);
     download_blocking(&url, &output);
     Ok(output)
+}
+
+/// Panic if dependcies are missing from PATH
+pub fn check_deps(tools: &[&str]) {
+    log::debug!("Checking dependencies");
+    for tool in tools {
+        match which(tool) {
+            Ok(path) => log::debug!("{tool} ✓  ({})", path.display()),
+            Err(_) => {
+                log::error!("{tool} ✗  not found in PATH");
+                log::error!("Please install dependencies (nix is the recommended way)");
+                panic!();
+            }
+        }
+    }
+}
+
+fn ref_dir() -> PathBuf {
+    PathBuf::from("data/ref")
 }

@@ -3,7 +3,7 @@ fasta = "/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full
 # Configuration for raw GIAB patients data
 [real]
 patients = [] #["HG001", "HG002", "HG003", "HG004", "HG005", "HG006", "HG007"]
-depths = ["50x", "75x", "100x"]
+depths = [50, 75, 100]
 captures = ["agilent"] #, "idt", "truseq"]
 sequencers = ["hiseq4000", "novaseq"]
 

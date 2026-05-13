@@ -7,15 +7,16 @@
 //!
 //! At least one configuration should be set (real patients or insilico data)
 
+use crate::baid2020::{Capture, Sequencer};
+use crate::baid2020::{available, real_row};
+use crate::check_deps;
 use crate::download_blocking;
-use crate::fastqbaid2020::{Capture, Depth, Run, Sequencer};
-use crate::fastqbaid2020::{available, real_row};
 use crate::giab::{Patient, bed_url, vcf_url};
-use crate::giab::{bed_file, vcf_file};
+use crate::giab::{bed_filename, vcf_filename};
+use crate::run::Run;
 use crate::silico::*;
 use crate::{resolve_bam, resolve_fasta};
 use itertools::iproduct;
-// use polars::io::resolve_homedir;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -45,11 +46,11 @@ struct SilicoConfig {
 }
 
 #[derive(Deserialize, Debug)]
-struct RealConfig {
-    patients: Vec<Patient>,
-    sequencers: Vec<Sequencer>,
-    captures: Vec<Capture>,
-    depths: Vec<Depth>,
+pub struct RealConfig {
+    pub patients: Vec<Patient>,
+    pub sequencers: Vec<Sequencer>,
+    pub captures: Vec<Capture>,
+    pub depths: Vec<u32>,
 }
 
 pub struct SamplesheetRow {
@@ -82,10 +83,11 @@ fn candidate_runs(real: &RealConfig) -> HashSet<Run> {
         &real.depths
     )
     .map(|(p, s, c, d)| Run {
-        patient: *p,
-        sequencer: *s,
-        capture: *c,
+        sample: format!("{}", *p),
+        sequencer: (*s).to_string(),
+        capture: (*c).to_string(),
         depth: *d,
+        silico: None,
     })
     .collect::<HashSet<Run>>()
 }
@@ -116,11 +118,18 @@ fn filter_available_runs(real: &RealConfig) -> HashSet<Run> {
 fn download_giab_runs(runs: &HashSet<Run>) {
     let out_dir = PathBuf::from("data/ref");
     std::fs::create_dir_all(&out_dir).expect("Could not create directory");
-    let patients: HashSet<Patient> = runs.iter().map(|r| r.patient).collect();
+    let patients: HashSet<Patient> = runs
+        .iter()
+        .map(|r| {
+            r.sample
+                .parse::<Patient>()
+                .expect("Failed to convert sample to patient")
+        })
+        .collect();
     for p in patients {
         println!("{:?}", p);
-        let mut vcf = out_dir.clone().join(vcf_file(&p));
-        let bed = out_dir.clone().join(bed_file(&p));
+        let mut vcf = out_dir.clone().join(vcf_filename(&p));
+        let bed = out_dir.clone().join(bed_filename(&p));
         download_blocking(&vcf_url(&p), &vcf);
         vcf.set_extension("gz.tbi");
         download_blocking(&vcf_url(&p), &vcf);
@@ -136,7 +145,7 @@ fn generate_controls(
     capture: &str,
     fasta: PathBuf,
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
-    check_controls_deps();
+    check_deps(&["bwa", "samtools", "muteditor"]);
 
     let outdir = silico
         .outdir

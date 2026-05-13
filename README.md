@@ -17,5 +17,5 @@ Run your pipeline. For `nf-core/sarek`, we recommend [our setup for germline ana
 
 Analyse data
 ```bash
-sherloxome analyze
+sherloxome benchmark
 ```

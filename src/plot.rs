@@ -1,6 +1,6 @@
 //! Visualise benchmarking results as interactive Vega-Lite boxplots.
 //!
-//! Reads the `merged.csv` produced by [`crate::analyze`] and opens a browser window
+//! Reads the `merged.csv` produced by [`crate::benchmark`] and opens a browser window
 //! showing F1-score distributions broken down by patient, sequencer, depth, and capture kit.
 
 // Column indices in merged.csv:

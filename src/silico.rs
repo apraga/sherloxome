@@ -1,6 +1,6 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
-use crate::download_blocking;
+use crate::{download_blocking, ref_dir};
 use log;
 use noodles::bed;
 use noodles::bgzf;
@@ -24,20 +24,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::process::{Command, Stdio};
 use std::thread;
-use which::which;
 
-/// Panic if `bwa`, `samtools`, or `muteditor` are not found in `PATH`.
-pub fn check_controls_deps() {
-    let tools = ["bwa", "samtools", "muteditor"];
-
-    log::debug!("Checking dependencies");
-    for tool in tools {
-        match which(tool) {
-            Ok(path) => log::debug!("{tool} ✓  ({})", path.display()),
-            Err(_) => panic!("{tool} ✗  not found in PATH"),
-        }
-    }
-}
 fn download_clinvar() -> PathBuf {
     log::debug!("Downloading clinvar vcf...");
     let mut url: String =
@@ -414,8 +401,7 @@ pub fn ensure_bwa_index(fasta: &PathBuf) -> Result<(), Box<dyn Error>> {
     let tar_name = "GCA_000001405.15_GRCh38_full_analysis_set.fna.bwa_index.tar.gz";
     let root_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.26_GRCh38/GRCh38_major_release_seqs_for_alignment_pipelines";
     let url = format!("{root_url}/{tar_name}");
-    let ref_dir = PathBuf::from("data/ref");
-    let tar_path = ref_dir.join(tar_name);
+    let tar_path = ref_dir().join(tar_name);
     log::debug!("Downloading BWA index...");
     download_blocking(&url, &tar_path);
     log::debug!("Extracting BWA index...");
@@ -424,7 +410,7 @@ pub fn ensure_bwa_index(fasta: &PathBuf) -> Result<(), Box<dyn Error>> {
             "-xzf",
             tar_path.to_str().ok_or("Invalid tar path")?,
             "-C",
-            ref_dir.to_str().ok_or("Invalid ref dir")?,
+            ref_dir().to_str().ok_or("Invalid ref dir")?,
         ])
         .status()?;
     if !status.success() {

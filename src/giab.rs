@@ -2,9 +2,11 @@
 //!
 //! Here are defined the patients available in GIAB reference dataset. This module provide access to the VCF.
 //! For raw data, [see here](crate::fastqbaid2020)
+use crate::ref_dir;
 use serde::Deserialize;
 use std::fmt;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 /// Patient ID according to GIAB
 /// Equality is required to compare runs [see here](crate::fastqbaid2020)
@@ -34,6 +36,22 @@ impl fmt::Display for Patient {
     }
 }
 
+impl FromStr for Patient {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "HG001" => Ok(Patient::HG001),
+            "HG002" => Ok(Patient::HG002),
+            "HG003" => Ok(Patient::HG003),
+            "HG004" => Ok(Patient::HG004),
+            "HG005" => Ok(Patient::HG005),
+            "HG006" => Ok(Patient::HG006),
+            "HG007" => Ok(Patient::HG007),
+            _ => Err(()),
+        }
+    }
+}
+
 const BASE_URL: &str = "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release";
 
 /// GIAB FTP sub-path that is unique to each patient.
@@ -51,27 +69,37 @@ fn url_tail(p: &Patient) -> &'static str {
 
 /// GIAB full URL on their FTP
 pub fn vcf_url(p: &Patient) -> String {
-    format!("{BASE_URL}/{}/{}", url_tail(p), vcf_file(p))
+    format!("{BASE_URL}/{}/{}", url_tail(p), vcf_filename(p).display())
 }
 
 /// GIAB file name on their FTP
-pub fn vcf_file(p: &Patient) -> String {
-    format!("{p}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz")
+pub fn vcf_filename(p: &Patient) -> PathBuf {
+    PathBuf::from(format!("{p}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"))
+}
+
+/// Full path locally (in data/ref). Must be download beforehand
+pub fn vcf_path(p: &Patient) -> PathBuf {
+    ref_dir().join(vcf_filename(p))
 }
 
 /// GIAB Base file name for the benchmark BED.
 /// HG001–HG004 ship a `_noinconsistent` BED; HG005–HG007 use the plain one.
-pub fn bed_file(p: &Patient) -> String {
+pub fn bed_filename(p: &Patient) -> PathBuf {
     let suffix = match p {
         Patient::HG002 | Patient::HG003 | Patient::HG004 => "_noinconsistent.bed",
         _ => ".bed",
     };
-    format!("{p}_GRCh38_1_22_v4.2.1_benchmark{suffix}")
+    PathBuf::from(format!("{p}_GRCh38_1_22_v4.2.1_benchmark{suffix}"))
+}
+
+/// Full GIAB bed file locally
+pub fn bed_path(p: &Patient) -> PathBuf {
+    ref_dir().join(bed_filename(p))
 }
 
 /// GIAB full URL on their FTP
 pub fn bed_url(p: &Patient) -> String {
-    format!("{BASE_URL}/{}/{}", url_tail(p), bed_file(p))
+    format!("{BASE_URL}/{}/{}", url_tail(p), bed_filename(p).display())
 }
 
 /// Infer the GIAB [`Patient`] from a file path by matching its string representation.
