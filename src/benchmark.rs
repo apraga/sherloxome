@@ -199,7 +199,7 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
 /// Generate a SDF index from FASTA for hap.py (stored alongside the FASTA file).
 fn fasta_to_sdf(fasta: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let sdf = fasta.with_extension("sdf");
-    if !sdf.exists() {
+    if !sdf.join("mainIndex").exists() {
         Command::new("rtg")
             .arg("format")
             .arg(fasta)
