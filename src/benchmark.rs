@@ -47,16 +47,18 @@ pub fn analyze(
         .filter_map(|(run, vcf)| run_to_happy(run, vcf))
         .collect();
 
+    download_missing(&queue);
+
     queue
         .into_par_iter()
         .filter_map(|item| {
             validate_files(&[
                 &item.query_vcf,
-                &item.query_vcf,
+                &item.query_bed,
                 &item.truth_vcf,
                 &item.truth_bed,
-            ]);
-            Some(item)
+            ])
+            .map(|_| item)
         })
         .for_each(|item| {
             happy_vcfeval(
@@ -227,7 +229,7 @@ fn happy_vcfeval(
         return;
     }
 
-    println!("Processing {:?}", query_vcf);
+    // println!("Processing {:?}", query_vcf);
     let status = Command::new("hap.py")
         .args([
             truth_vcf.to_str().unwrap(),
@@ -254,9 +256,21 @@ fn happy_vcfeval(
     }
 }
 
+/// Download missing GIAB truth VCF (.vcf.gz + .tbi) and BED for every real run in the queue.
+/// Silico runs are skipped — their truth VCF is produced by the setup step.
+fn download_missing(items: &[HappyRunSetup]) {
+    log::debug!("Downloading GIAB missing VCF/BEDs if needed");
+    for item in items {
+        let Some(patient) = giab::patient_from_filename(&item.truth_vcf) else {
+            continue;
+        };
+        crate::setup::download_giab_run(&patient);
+    }
+}
+
 fn validate_files(paths: &[&PathBuf]) -> Option<()> {
     if let Some(missing) = paths.iter().find(|p| !p.exists()) {
-        eprintln!("Missing {:?}, skipping analysis", missing);
+        log::warn!("Missing {}, skipping analysis", missing.display());
         return None;
     }
     Some(())

@@ -102,6 +102,16 @@ pub fn bed_url(p: &Patient) -> String {
     format!("{BASE_URL}/{}/{}", url_tail(p), bed_filename(p).display())
 }
 
+/// GIAB full URL for the VCF tabix index (.tbi)
+pub fn tbi_url(p: &Patient) -> String {
+    format!("{}.tbi", vcf_url(p))
+}
+
+/// Full path locally for the VCF tabix index
+pub fn tbi_path(p: &Patient) -> PathBuf {
+    PathBuf::from(format!("{}.tbi", vcf_path(p).display()))
+}
+
 /// Infer the GIAB [`Patient`] from a file path by matching its string representation.
 pub fn patient_from_filename(fname: &PathBuf) -> Option<Patient> {
     let name = fname.to_string_lossy();

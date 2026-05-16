@@ -11,8 +11,8 @@ use crate::baid2020::{Capture, Sequencer};
 use crate::baid2020::{available, real_row};
 use crate::check_deps;
 use crate::download_blocking;
-use crate::giab::{Patient, bed_url, vcf_url};
-use crate::giab::{bed_filename, vcf_filename};
+use crate::giab::{Patient, bed_url, tbi_url, vcf_url};
+use crate::giab::{bed_filename, tbi_path, vcf_filename};
 use crate::run::Run;
 use crate::silico::*;
 use crate::{resolve_bam, resolve_fasta};
@@ -115,9 +115,17 @@ fn filter_available_runs(real: &RealConfig) -> HashSet<Run> {
 }
 
 /// Download reference VCF and BED for the patients present in the given runs.
-fn download_giab_runs(runs: &HashSet<Run>) {
+pub fn download_giab_run(patient: &Patient) {
     let out_dir = PathBuf::from("data/ref");
     std::fs::create_dir_all(&out_dir).expect("Could not create directory");
+    let vcf = out_dir.join(vcf_filename(patient));
+    let bed = out_dir.join(bed_filename(patient));
+    download_blocking(&vcf_url(patient), &vcf);
+    download_blocking(&tbi_url(patient), &tbi_path(patient));
+    download_blocking(&bed_url(patient), &bed);
+}
+
+fn download_giab_runs(runs: &HashSet<Run>) {
     let patients: HashSet<Patient> = runs
         .iter()
         .map(|r| {
@@ -127,13 +135,7 @@ fn download_giab_runs(runs: &HashSet<Run>) {
         })
         .collect();
     for p in patients {
-        println!("{:?}", p);
-        let mut vcf = out_dir.clone().join(vcf_filename(&p));
-        let bed = out_dir.clone().join(bed_filename(&p));
-        download_blocking(&vcf_url(&p), &vcf);
-        vcf.set_extension("gz.tbi");
-        download_blocking(&vcf_url(&p), &vcf);
-        download_blocking(&bed_url(&p), &bed);
+        download_giab_run(&p);
     }
 }
 
