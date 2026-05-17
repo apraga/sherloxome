@@ -16,7 +16,7 @@ stdenv.mkDerivation {
   ];
 
   configurePhase = ''
-    cmake .
+    cmake . -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   '';
 
   buildPhase = ''
