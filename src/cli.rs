@@ -71,12 +71,7 @@ pub fn process_cli() {
         } => {
             let conf = read_config(config.to_path_buf());
             log::info!("Analyzing runs...");
-            if let Err(e) = analyze(
-                &conf.fasta,
-                conf.capture,
-                input.to_path_buf(),
-                output.to_path_buf(),
-            ) {
+            if let Err(e) = analyze(&conf, input.to_path_buf(), output.to_path_buf()) {
                 eprintln!("Analysis failed: {e}");
                 std::process::exit(1);
             }

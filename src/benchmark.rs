@@ -32,8 +32,6 @@ struct HappyRunSetup {
 /// Real patient VCFs use GIAB as truth; the silico VCF uses the `_success.vcf.gz` from setup.
 pub fn analyze(
     conf: &Config,
-    // fasta: &str,
-    // capture: HashMap<String, String>,
     input_dir: PathBuf,
     output_dir: PathBuf,
 ) -> Result<(), Box<dyn Error>> {

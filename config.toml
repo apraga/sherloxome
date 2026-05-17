@@ -2,10 +2,10 @@ fasta = "/Work/Groups/bisonex/dgenomes/genome-human/GCA_000001405.15_GRCh38_full
 
 # Configuration for raw GIAB patients data
 [real]
-patients = [] #["HG001", "HG002", "HG003", "HG004", "HG005", "HG006", "HG007"]
-depths = [50, 75, 100]
+patients = ["HG002"] #["HG001", "HG002", "HG003", "HG004", "HG005", "HG006", "HG007"]
+depths = [50] #, 75, 100]
 captures = ["agilent"] #, "idt", "truseq"]
-sequencers = ["hiseq4000", "novaseq"]
+sequencers = ["hiseq4000"] #, "novaseq"]
 
 # Insert controls into a single patient BAM or generate in-silico fastq
 # Output will be in data/exp_raw
