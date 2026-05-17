@@ -1,7 +1,8 @@
 {
 
     inputs = {
-        nixpkgs.url = "nixpkgs/nixos-25.11";
+        nixpkgs.url = "github:NixOS/nixpkgs/68799d2b3b33ca5a2406d99ec5d67900a1ea658f";
+        # nixpkgs.url = "nixpkgs/nixos-25.11";
     };
 
     description = "Exome validator";
@@ -10,18 +11,20 @@
         let
             system = "x86_64-linux";
             pkgs = import nixpkgs { inherit system; };
-            local-rtg-tools = pkgs.callPackage pkgs/rtg-tools/package.nix {};
-        in {
-            packages.${system} = {
+            deps = {
                 varben = pkgs.callPackage pkgs/varben/package.nix {};
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
                 bwa = pkgs.bwa;
-                # Wait for upstream to add it
-                # rtg-tools = pkgs.rtg-tools;
-                # hap-py = pkgs.hap-py;
-                rtg-tools = local-rtg-tools;
-                hap-py = pkgs.callPackage pkgs/hap-py/package.nix { rtg-tools = local-rtg-tools; };
+                rtg-tools = pkgs.rtg-tools;
+                hap-py = pkgs.hap-py;
                 samtools = pkgs.samtools;
+            };
+        in {
+            packages.${system} = deps // {
+                default = pkgs.buildEnv {
+                    name = "sherloxome";
+                    paths = builtins.attrValues deps;
+                };
             };
         };
 }

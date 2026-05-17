@@ -24,6 +24,5 @@ work
 *.bam
 *.bam.bai
 *.mut
-varben
 .nextflow.log*
 test*

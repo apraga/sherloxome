@@ -4,6 +4,10 @@ A benchmarking tool for validating exome/targeted capture. It serves to prepare 
 
 ## Quickstart
 
+Install all dependencies with Nix:
+```bash
+nix profile add .
+```
 Generate FASQT for testing:
 ```bash
 cargo install
