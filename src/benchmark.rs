@@ -2,7 +2,6 @@
 //!
 //! Run metadata (patient, sequencer, capture kit, depth) is extracted from VCF filenames,
 //! so files must be named using the conventions established in [`crate::fastqbaid2020`].
-use crate::baid2020;
 use crate::check_deps;
 use crate::giab;
 use crate::ref_dir;
@@ -13,7 +12,7 @@ use glob::glob;
 use polars::lazy::prelude::*;
 use polars::prelude::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-// use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
@@ -42,7 +41,7 @@ pub fn analyze(
     let runs = runs_to_analyze(&input_dir)?;
     let queue: Vec<HappyRunSetup> = runs
         .into_iter()
-        .filter_map(|(run, vcf)| run_to_happy(run, vcf))
+        .filter_map(|(run, vcf)| run_to_happy(run, vcf, &conf.capture))
         .collect();
 
     download_missing(&queue);
@@ -99,28 +98,35 @@ fn runs_to_analyze(input_dir: &Path) -> Result<Vec<(Run, PathBuf)>, Box<dyn Erro
 }
 
 /// For a run, find reference VCF and capture for happy
-fn run_to_happy(run: Run, query_vcf: PathBuf) -> Option<HappyRunSetup> {
+fn run_to_happy(
+    run: Run,
+    query_vcf: PathBuf,
+    captures: &HashMap<String, String>,
+) -> Option<HappyRunSetup> {
     match run.silico {
-        Some(_) => silico_run_to_happy(run, query_vcf).ok(),
-        None => real_run_to_happy(run, query_vcf)
+        Some(_) => silico_run_to_happy(run, query_vcf, captures).ok(),
+        None => real_run_to_happy(run, query_vcf, captures)
             .map_err(|e| log::warn!("{e}"))
             .ok(),
     }
 }
 
 /// For a GIB run, find reference data
-fn real_run_to_happy(run: Run, query_vcf: PathBuf) -> Result<HappyRunSetup, Box<dyn Error>> {
+fn real_run_to_happy(
+    run: Run,
+    query_vcf: PathBuf,
+    captures: &HashMap<String, String>,
+) -> Result<HappyRunSetup, Box<dyn Error>> {
     let patient = run
         .sample
         .parse::<giab::Patient>()
         .map_err(|_| format!("unknown GIAB patient: {}", run.sample))?;
-    let capture = run
-        .capture
-        .parse::<baid2020::Capture>()
-        .map_err(|_| format!("unknown capture: {}", run.capture))?;
     let truth_vcf = giab::vcf_path(&patient);
     let truth_bed = giab::bed_path(&patient);
-    let query_bed = baid2020::capture_path(capture);
+    let query_bed = captures
+        .get(&run.capture)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("capture '{}' not found in config [capture] section", run.capture))?;
     Ok(HappyRunSetup {
         prefix: run_to_string(&run),
         query_vcf,
@@ -133,14 +139,17 @@ fn real_run_to_happy(run: Run, query_vcf: PathBuf) -> Result<HappyRunSetup, Box<
 /// TODO support fastq generation with simuscop
 /// For silico run, the reference vcf is simply SAMPLE_success.vcf.gz
 /// There is no truth_bed, we simple use the capture
-fn silico_run_to_happy(run: Run, query_vcf: PathBuf) -> Result<HappyRunSetup, Box<dyn Error>> {
+fn silico_run_to_happy(
+    run: Run,
+    query_vcf: PathBuf,
+    captures: &HashMap<String, String>,
+) -> Result<HappyRunSetup, Box<dyn Error>> {
     let prefix = run_to_string(&run);
     let truth_vcf = ref_dir().join(run.sample).join("_success.vcf.gz");
-    let capture = run
-        .capture
-        .parse::<baid2020::Capture>()
-        .map_err(|_| format!("unknown capture: {}", run.capture))?;
-    let query_bed = baid2020::capture_path(capture);
+    let query_bed = captures
+        .get(&run.capture)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("capture '{}' not found in config [capture] section", run.capture))?;
     let truth_bed = query_bed.clone();
     Ok(HappyRunSetup {
         prefix,

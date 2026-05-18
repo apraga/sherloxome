@@ -12,7 +12,6 @@ use crate::setup::SamplesheetRow;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt;
-use std::path::PathBuf;
 use std::str::FromStr;
 
 /// Capture kit
@@ -50,16 +49,6 @@ impl FromStr for Capture {
     }
 }
 
-/// Capture as a BED file
-pub fn capture_path(c: Capture) -> PathBuf {
-    match c {
-        Capture::Agilent => PathBuf::from("data/capture/agilent.targets.grch38.bed"),
-        Capture::Idt => PathBuf::from("data/capture/idt_capture.grch38.bed"),
-        Capture::Truseq => PathBuf::from(
-            "data/capture/truseq-dna-exome-targeted-regions-manifest-v1-2-lifted-grch38.bed",
-        ),
-    }
-}
 /// Sequencer (novaseq, hiseq)
 #[derive(Copy, Clone, Deserialize, Debug, Hash, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]

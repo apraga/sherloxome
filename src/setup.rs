@@ -33,6 +33,24 @@ pub struct Config {
     pub capture: HashMap<String, String>,
 }
 
+impl Config {
+    pub fn validate(&self) -> Result<(), Box<dyn Error>> {
+        let missing: Vec<String> = crate::baid2020::all_captures()
+            .into_iter()
+            .map(|c| c.to_string())
+            .filter(|name| !self.capture.contains_key(name))
+            .collect();
+        if !missing.is_empty() {
+            return Err(format!(
+                "Missing required captures in [capture] section: {}",
+                missing.join(", ")
+            )
+            .into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Deserialize, Debug)]
 struct SilicoConfig {
     capture: Capture,
@@ -262,4 +280,40 @@ fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetRow {
         fastq_1: fq1_str,
         fastq_2: fq2_str,
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config_with_captures(captures: &[(&str, &str)]) -> Config {
+        Config {
+            fasta: String::new(),
+            real: None,
+            silico: None,
+            capture: captures
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn rejects_missing_captures() {
+        let conf = config_with_captures(&[("agilent", "agilent.bed")]);
+        let err = conf.validate().unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("idt"), "expected idt in error: {msg}");
+        assert!(msg.contains("truseq"), "expected truseq in error: {msg}");
+    }
+
+    #[test]
+    fn accepts_all_required_captures() {
+        let conf = config_with_captures(&[
+            ("agilent", "agilent.bed"),
+            ("idt", "idt.bed"),
+            ("truseq", "truseq.bed"),
+        ]);
+        assert!(conf.validate().is_ok());
+    }
 }

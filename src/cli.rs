@@ -49,6 +49,10 @@ enum Commands {
 fn read_config(fname: PathBuf) -> Config {
     let content = std::fs::read_to_string(fname).unwrap();
     let conf: Config = toml::from_str(&content).unwrap();
+    if let Err(e) = conf.validate() {
+        eprintln!("Invalid config: {e}");
+        std::process::exit(1);
+    }
     conf
 }
 
