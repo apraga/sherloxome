@@ -23,8 +23,7 @@ bam = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
 clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
 # Number of random clinvar variants to insert into the BAM file. Default is 1000
 nb_variants = 2
-# URL to fasta, or link to local version, otherwise download it from NCBI
-fasta =  "data/ref/chr21.fna"
+
 
 # Define here the name of alls captures and the bed file
 [capture]
