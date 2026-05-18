@@ -44,9 +44,9 @@ type BedIndex = HashMap<String, Vec<(usize, usize)>>;
 /// For each chromosome, store sorted list of (start, end) 0-based half-open intervals
 /// Assubme bed is stored
 fn load_bed(bed: &PathBuf) -> Result<BedIndex, Box<dyn Error>> {
-    let mut reader = File::open(bed)
-        .map(BufReader::new)
-        .map(bed::io::Reader::<3, _>::new)?;
+    let file = File::open(bed)
+        .map_err(|e| format!("Failed to open BED {}: {e}", bed.display()))?;
+    let mut reader = bed::io::Reader::<3, _>::new(BufReader::new(file));
 
     let mut index = BedIndex::new();
     let mut record = bed::Record::default();
@@ -204,10 +204,9 @@ pub fn sample_clinvar(
     mut_out: PathBuf,
 ) -> Result<vcf::Header, Box<dyn Error>> {
     let capture = load_bed(&bed)?;
-    let mut reader = File::open(&clinvar_vcf)
-        .map(bgzf::io::Reader::new)
-        .map(vcf::io::Reader::new)
-        .expect("Failed to open clinvar file");
+    let file = File::open(&clinvar_vcf)
+        .map_err(|e| format!("Failed to open ClinVar VCF {}: {e}", clinvar_vcf.display()))?;
+    let mut reader = vcf::io::Reader::new(bgzf::io::Reader::new(file));
     let header = reader.read_header()?;
 
     if vcf_out.exists() && mut_out.exists() {
@@ -568,7 +567,10 @@ fn write_varben_as_vcf_single(
 ) -> Result<(), Box<dyn Error>> {
     let mut fasta_reader = fasta::io::indexed_reader::Builder::default().build_from_path(fasta)?;
 
-    let reader = BufReader::new(File::open(mut_file)?);
+    let reader = BufReader::new(
+        File::open(&mut_file)
+            .map_err(|e| format!("Failed to open mutation file {}: {e}", mut_file.display()))?,
+    );
     let mut records: Vec<RecordBuf> = Vec::new();
 
     for line in reader.lines() {

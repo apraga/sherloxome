@@ -20,11 +20,11 @@ fastq = true
 bam = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
 # Required for generating a bam file
 # VCF containing clinvar variants. If not set, the VCF will be downloaded from NCBI
-clinvar = "data/exp_raw/clinvar_chr21.vcf.gz"
+clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
 # Number of random clinvar variants to insert into the BAM file. Default is 1000
 nb_variants = 2
 # URL to fasta, or link to local version, otherwise download it from NCBI
-fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
+fasta =  "data/ref/chr21.fna"
 
 # Define here the name of alls captures and the bed file
 [capture]
