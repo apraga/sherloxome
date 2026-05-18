@@ -1,6 +1,6 @@
 # URL to fasta, or link to local version, otherwise download it from NCBI
 # We need a full fasta for silico data to avoid remapping error
-fasta = "data/ref/GCA_000001405.15_GRCh38_full_analysis_set.fna"
+fasta = ""
 
 # Configuration for raw GIAB patients data
 [real]

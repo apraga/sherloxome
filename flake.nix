@@ -15,7 +15,9 @@
                 varben = pkgs.callPackage pkgs/varben/package.nix {};
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
                 bwa = pkgs.bwa;
-                rtg-tools = pkgs.rtg-tools;
+                # Waiting for PR to be merged
+                rtg-tools = pkgs.callPackage pkgs/rtg-tools/package.nix {};
+                # rtg-tools = pkgs.rtg-tools;
                 hap-py = pkgs.hap-py;
                 samtools = pkgs.samtools;
             };
