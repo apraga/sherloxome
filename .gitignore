@@ -17,8 +17,8 @@ GCA*.fna
 GCA*.fna.*
 .nextflow*
 work
-# *.bam
-# *.bai
+*.bam
+*.bai
 *.mut
 HG002.chr21-hiseq4000-agilent-50x.bam
 HG002.chr21-hiseq4000-agilent-50x_nohardclip.bam
