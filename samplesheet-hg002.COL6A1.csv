@@ -1,2 +1,0 @@
-patient,sample,lane,fastq_1,fastq_2
-HG002,HG002.COL6A1-hiseq4000-agilent-50x,1,./data/exp_raw/HG002.COL6A1-hiseq4000-agilent-50x-R1.fastq.gz,./data/exp_raw/HG002.COL6A1-hiseq4000-agilent-50x-R2.fastq.gz

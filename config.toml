@@ -15,7 +15,7 @@ capture = "agilent-col6a1"
 # Generate a fastq fully in silico
 fastq = true
 # Either an URL or a local link to insert variants in a BAM file
-bam = "data/exp_raw/HG002-COL6A1_hiseq4000_agilent_50x.bam"
+bam = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
 # Required for generating a bam file
 # VCF containing clinvar variants. If not set, the VCF will be downloaded from NCBI
 clinvar = "data/exp_raw/clinvar_chr21.vcf.gz"
