@@ -1,5 +1,7 @@
 # Sherloxome
 
+[![CI](https://github.com/apraga/sherloxome/actions/workflows/ci.yml/badge.svg)](https://github.com/apraga/sherloxome/actions/workflows/ci.yml)
+
 A benchmarking tool for validating exome/targeted capture. It serves to prepare testing FASTQ data (real patients or insilico) and compute benchmarking data.
 
 ## Quickstart
