@@ -1,6 +1,6 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
-use crate::{download_blocking, ref_dir};
+use crate::download_blocking;
 use log;
 use noodles::bed;
 use noodles::bgzf;
@@ -44,8 +44,7 @@ type BedIndex = HashMap<String, Vec<(usize, usize)>>;
 /// For each chromosome, store sorted list of (start, end) 0-based half-open intervals
 /// Assubme bed is stored
 fn load_bed(bed: &PathBuf) -> Result<BedIndex, Box<dyn Error>> {
-    let file = File::open(bed)
-        .map_err(|e| format!("Failed to open BED {}: {e}", bed.display()))?;
+    let file = File::open(bed).map_err(|e| format!("Failed to open BED {}: {e}", bed.display()))?;
     let mut reader = bed::io::Reader::<3, _>::new(BufReader::new(file));
 
     let mut index = BedIndex::new();
@@ -390,30 +389,22 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     Ok(filtered)
 }
 
-/// Download and extract the pre-built BWA index from NCBI if absent.
+/// Build a BWA index for `fasta` if any index file is missing.
 pub fn ensure_bwa_index(fasta: &PathBuf) -> Result<(), Box<dyn Error>> {
-    let bwt = PathBuf::from(format!("{}.bwt", fasta.display()));
-    if bwt.exists() {
+    let fasta_s = fasta.display();
+    let missing = [".bwt", ".ann", ".amb", ".pac", ".sa"]
+        .iter()
+        .any(|ext| !PathBuf::from(format!("{fasta_s}{ext}")).exists());
+    if !missing {
         log::debug!("BWA index already exists");
         return Ok(());
     }
-    let tar_name = "GCA_000001405.15_GRCh38_full_analysis_set.fna.bwa_index.tar.gz";
-    let root_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.26_GRCh38/GRCh38_major_release_seqs_for_alignment_pipelines";
-    let url = format!("{root_url}/{tar_name}");
-    let tar_path = ref_dir().join(tar_name);
-    log::debug!("Downloading BWA index...");
-    download_blocking(&url, &tar_path);
-    log::debug!("Extracting BWA index...");
-    let status = Command::new("tar")
-        .args([
-            "-xzf",
-            tar_path.to_str().ok_or("Invalid tar path")?,
-            "-C",
-            ref_dir().to_str().ok_or("Invalid ref dir")?,
-        ])
+    log::debug!("Running bwa index on {:?}", fasta);
+    let status = Command::new("bwa")
+        .args(["index", fasta.to_str().ok_or("Invalid fasta path")?])
         .status()?;
     if !status.success() {
-        return Err(format!("tar exited with status {status}").into());
+        return Err(format!("bwa index exited with status {status}").into());
     }
     Ok(())
 }
@@ -563,10 +554,12 @@ fn write_varben_as_vcf_single(
 ) -> Result<(), Box<dyn Error>> {
     let mut fasta_reader = fasta::io::indexed_reader::Builder::default().build_from_path(fasta)?;
 
-    let reader = BufReader::new(
-        File::open(&mut_file)
-            .map_err(|e| format!("Failed to open mutation file {}: {e}", mut_file.display()))?,
-    );
+    let reader = BufReader::new(File::open(&mut_file).map_err(|e| {
+        format!(
+            "Failed to open mutation file {}: {e}. Clean-up the directory and restart.",
+            mut_file.display()
+        )
+    })?);
     let mut records: Vec<RecordBuf> = Vec::new();
 
     for line in reader.lines() {

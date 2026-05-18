@@ -17,6 +17,7 @@ pub mod setup;
 pub mod silico;
 use log;
 use std::path::PathBuf;
+use std::process::Command;
 use which::which;
 
 /// Helper to download a single URL. Assume the output directory exist
@@ -82,9 +83,36 @@ fn download_fasta(outdir: PathBuf) -> Result<PathBuf, Box<dyn Error>> {
             std::fs::File::create(&fasta_path).expect("Failed to create decompressed fasta");
         std::io::copy(&mut decoder, &mut out_file).expect("Failed to decompress fasta");
     }
-    let url = format!("{root_url}/{fai_dist}");
-    download_blocking(&url, &fai_path);
+    if !fai_path.exists() {
+        let url = format!("{root_url}/{fai_dist}");
+        download_blocking(&url, &fai_path);
+    }
+    download_bwa_index(&fasta_path, root_url)?;
     Ok(fasta_path)
+}
+
+fn download_bwa_index(fasta: &PathBuf, root_url: &str) -> Result<(), Box<dyn Error>> {
+    let bwt = PathBuf::from(format!("{}.bwt", fasta.display()));
+    if bwt.exists() {
+        return Ok(());
+    }
+    let tar_name = "GCA_000001405.15_GRCh38_full_analysis_set.fna.bwa_index.tar.gz";
+    let outdir = fasta.parent().ok_or("fasta has no parent directory")?;
+    let tar_path = outdir.join(tar_name);
+    download_blocking(&format!("{root_url}/{tar_name}"), &tar_path);
+    log::debug!("Extracting BWA index...");
+    let status = Command::new("tar")
+        .args([
+            "-xzf",
+            tar_path.to_str().ok_or("Invalid tar path")?,
+            "-C",
+            outdir.to_str().ok_or("Invalid ref dir")?,
+        ])
+        .status()?;
+    if !status.success() {
+        return Err(format!("tar exited with status {status}").into());
+    }
+    Ok(())
 }
 
 /// Download a bam file if it's an url, otherwise check the file exist
