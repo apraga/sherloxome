@@ -16,7 +16,6 @@ use std::str::FromStr;
 
 /// Capture kit
 /// - Agilent_SureSelect_All_Exons_v7_hg38
-/// - Agilent limited to COL6A1 (for testing only)
 /// - Truseq exome: we use the version lifter in hg38 through UCSC
 /// - IDT-xGen : xgen-exome-hyb-panel-v2-targets-hg38
 #[derive(Copy, Clone, Deserialize, Debug, Hash, Eq, PartialEq)]
@@ -483,13 +482,7 @@ pub fn url(run: &Run, lane: &str) -> String {
 
 /// All supported capture kits.
 pub fn all_captures() -> Vec<Capture> {
-    [
-        Capture::Agilent,
-        Capture::AgilentCOL6A1,
-        Capture::Idt,
-        Capture::Truseq,
-    ]
-    .to_vec()
+    [Capture::Agilent, Capture::Idt, Capture::Truseq].to_vec()
 }
 
 /// All supported sequencer types.

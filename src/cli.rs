@@ -8,8 +8,8 @@ use crate::benchmark::analyze;
 use crate::plot::plot;
 use crate::setup::{Config, setup};
 use clap::{Parser, Subcommand};
+use std::error::Error;
 use std::path::PathBuf;
-use toml;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -46,42 +46,36 @@ enum Commands {
     },
 }
 
-fn read_config(fname: PathBuf) -> Config {
-    let content = std::fs::read_to_string(fname).unwrap();
-    let conf: Config = toml::from_str(&content).unwrap();
-    if let Err(e) = conf.validate() {
-        eprintln!("Invalid config: {e}");
-        std::process::exit(1);
-    }
-    conf
+fn read_config(fname: &PathBuf) -> Result<Config, Box<dyn Error>> {
+    let content = std::fs::read_to_string(fname)
+        .map_err(|e| format!("Cannot read config {}: {e}", fname.display()))?;
+    let conf: Config = toml::from_str(&content)
+        .map_err(|e| format!("Invalid config {}: {e}", fname.display()))?;
+    conf.validate()?;
+    Ok(conf)
 }
 
 /// Read CLI arguments and call relevant functions
-pub fn process_cli() {
+pub fn process_cli() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     match &cli.command {
         Commands::Setup { config } => {
-            let conf = read_config(config.to_path_buf());
+            let conf = read_config(config)?;
             log::info!("Setting up runs...");
-            if let Err(e) = setup(conf) {
-                eprintln!("Setup failed: {e}");
-                std::process::exit(1);
-            }
+            setup(conf)?;
         }
         Commands::Benchmark {
             config,
             input,
             output,
         } => {
-            let conf = read_config(config.to_path_buf());
+            let conf = read_config(config)?;
             log::info!("Analyzing runs...");
-            if let Err(e) = analyze(&conf, input.to_path_buf(), output.to_path_buf()) {
-                eprintln!("Analysis failed: {e}");
-                std::process::exit(1);
-            }
+            analyze(&conf, input.clone(), output.clone())?;
         }
         Commands::Plot { input, output } => {
-            let _ = plot(input.to_path_buf(), output.to_path_buf());
+            plot(input.clone(), output.clone())?;
         }
     }
+    Ok(())
 }

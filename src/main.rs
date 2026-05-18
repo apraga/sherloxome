@@ -1,7 +1,9 @@
-use env_logger;
 use sherloxome::cli::process_cli;
 
 fn main() {
     env_logger::init();
-    process_cli();
+    if let Err(e) = process_cli() {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
 }

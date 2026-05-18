@@ -126,7 +126,12 @@ fn real_run_to_happy(
     let query_bed = captures
         .get(&run.capture)
         .map(PathBuf::from)
-        .ok_or_else(|| format!("capture '{}' not found in config [capture] section", run.capture))?;
+        .ok_or_else(|| {
+            format!(
+                "capture '{}' not found in config [capture] section",
+                run.capture
+            )
+        })?;
     Ok(HappyRunSetup {
         prefix: run_to_string(&run),
         query_vcf,
@@ -149,7 +154,12 @@ fn silico_run_to_happy(
     let query_bed = captures
         .get(&run.capture)
         .map(PathBuf::from)
-        .ok_or_else(|| format!("capture '{}' not found in config [capture] section", run.capture))?;
+        .ok_or_else(|| {
+            format!(
+                "capture '{}' not found in config [capture] section",
+                run.capture
+            )
+        })?;
     let truth_bed = query_bed.clone();
     Ok(HappyRunSetup {
         prefix,
@@ -160,19 +170,19 @@ fn silico_run_to_happy(
     })
 }
 
-/// Extract the filename stem from a BAM URL or local path (strips directory and `.bam`).
-fn bam_stem(bam: &str) -> String {
-    let filename = if bam.starts_with("http://") || bam.starts_with("https://") {
-        bam.split('/').last().unwrap_or(bam).to_string()
-    } else {
-        let path = PathBuf::from(bam);
-        path.file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or(bam)
-            .to_string()
-    };
-    filename.trim_end_matches(".bam").to_string()
-}
+// /// Extract the filename stem from a BAM URL or local path (strips directory and `.bam`).
+// fn bam_stem(bam: &str) -> String {
+//     let filename = if bam.starts_with("http://") || bam.starts_with("https://") {
+//         bam.split('/').last().unwrap_or(bam).to_string()
+//     } else {
+//         let path = PathBuf::from(bam);
+//         path.file_name()
+//             .and_then(|s| s.to_str())
+//             .unwrap_or(bam)
+//             .to_string()
+//     };
+//     filename.trim_end_matches(".bam").to_string()
+// }
 
 /// Merge all hap.py summary CSVs in output_dir into a single merged.csv with run metadata columns.
 fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
@@ -206,7 +216,15 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
 /// Generate a SDF index from FASTA for hap.py (stored alongside the FASTA file).
 fn fasta_to_sdf(fasta: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let sdf = fasta.with_extension("sdf");
-    if !sdf.join("mainIndex").exists() {
+    if sdf.join("mainIndex").exists() {
+        println!("{} already exists", sdf.display());
+    } else if sdf.exists() {
+        return Err(format!(
+            "SDF directory {} exists but is incomplete; remove it and retry",
+            sdf.display()
+        )
+        .into());
+    } else {
         Command::new("rtg")
             .arg("format")
             .arg(fasta)
@@ -214,8 +232,6 @@ fn fasta_to_sdf(fasta: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
             .arg(&sdf)
             .status()
             .map_err(|e| format!("Failed to execute rtg format: {e}"))?;
-    } else {
-        println!("{} already exists", sdf.display())
     }
     Ok(sdf)
 }

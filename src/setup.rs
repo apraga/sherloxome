@@ -35,9 +35,15 @@ pub struct Config {
 
 impl Config {
     pub fn validate(&self) -> Result<(), Box<dyn Error>> {
-        let missing: Vec<String> = crate::baid2020::all_captures()
+        let mut required: Vec<String> = Vec::new();
+        if let Some(real) = &self.real {
+            required.extend(real.captures.iter().map(|c| c.to_string()));
+        }
+        if let Some(silico) = &self.silico {
+            required.push(silico.capture.clone());
+        }
+        let missing: Vec<String> = required
             .into_iter()
-            .map(|c| c.to_string())
             .filter(|name| !self.capture.contains_key(name))
             .collect();
         if !missing.is_empty() {
@@ -53,7 +59,7 @@ impl Config {
 
 #[derive(Deserialize, Debug)]
 struct SilicoConfig {
-    capture: Capture,
+    capture: String,
     bam: Option<String>,
     /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
     clinvar: Option<PathBuf>,
@@ -241,7 +247,7 @@ pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
 
     if let Some(silico) = &conf.silico {
         log::debug!("Silico patients selected");
-        let capture_str = &silico.capture.to_string();
+        let capture_str = &silico.capture;
         let bed = conf
             .capture
             .get(capture_str)
@@ -285,12 +291,37 @@ fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetRow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::baid2020::{Capture, Sequencer};
+    use crate::giab::Patient;
 
-    fn config_with_captures(captures: &[(&str, &str)]) -> Config {
+    fn make_real(captures: Vec<Capture>) -> RealConfig {
+        RealConfig {
+            patients: vec![Patient::HG002],
+            sequencers: vec![Sequencer::Novaseq],
+            captures,
+            depths: vec![50],
+        }
+    }
+
+    fn make_silico(capture: &str) -> SilicoConfig {
+        SilicoConfig {
+            capture: capture.to_string(),
+            bam: None,
+            clinvar: None,
+            nb_variants: None,
+            outdir: None,
+        }
+    }
+
+    fn config(
+        real: Option<RealConfig>,
+        silico: Option<SilicoConfig>,
+        captures: &[(&str, &str)],
+    ) -> Config {
         Config {
             fasta: String::new(),
-            real: None,
-            silico: None,
+            real,
+            silico,
             capture: captures
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -299,21 +330,48 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_captures() {
-        let conf = config_with_captures(&[("agilent", "agilent.bed")]);
-        let err = conf.validate().unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("idt"), "expected idt in error: {msg}");
-        assert!(msg.contains("truseq"), "expected truseq in error: {msg}");
+    fn accepts_empty_config() {
+        assert!(config(None, None, &[]).validate().is_ok());
     }
 
     #[test]
-    fn accepts_all_required_captures() {
-        let conf = config_with_captures(&[
-            ("agilent", "agilent.bed"),
-            ("idt", "idt.bed"),
-            ("truseq", "truseq.bed"),
-        ]);
+    fn rejects_real_with_missing_capture() {
+        let conf = config(
+            Some(make_real(vec![Capture::Agilent, Capture::Idt])),
+            None,
+            &[("agilent", "agilent.bed")],
+        );
+        let msg = conf.validate().unwrap_err().to_string();
+        assert!(msg.contains("idt"), "expected idt in error: {msg}");
+    }
+
+    #[test]
+    fn accepts_real_with_all_captures_present() {
+        let conf = config(
+            Some(make_real(vec![Capture::Agilent, Capture::Idt])),
+            None,
+            &[("agilent", "agilent.bed"), ("idt", "idt.bed")],
+        );
+        assert!(conf.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_silico_with_missing_capture() {
+        let conf = config(None, Some(make_silico("agilent-col6a1")), &[]);
+        let msg = conf.validate().unwrap_err().to_string();
+        assert!(
+            msg.contains("agilent-col6a1"),
+            "expected agilent-col6a1 in error: {msg}"
+        );
+    }
+
+    #[test]
+    fn accepts_silico_with_custom_capture() {
+        let conf = config(
+            None,
+            Some(make_silico("agilent-col6a1")),
+            &[("agilent-col6a1", "col6a1.bed")],
+        );
         assert!(conf.validate().is_ok());
     }
 }
