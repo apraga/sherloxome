@@ -1,12 +1,12 @@
 //! Generic run types shared across datasets.
 //!
 //! Output VCF filenames must adhere to this convention for analysis:
-//! `SAMPLE-SEQUENCER-CAPTURE-DEPTH{-SILICO}.*`
+//! `SAMPLE_SEQUENCER_CAPTURE_DEPTH{_SILICO}.*`
 //! Value are free text for maximum compatibility, with the exception of DEPTH that must be
 //! an integer followed by the 'x' character.
 //! Here is an example
 //!
-//!    HG002-novaseq-agilent-100x-simuscop.haplotypecaller.vcf.gz
+//!    HG002_novaseq_agilent_100x_simuscop.haplotypecaller.vcf.gz
 //!
 //! Where SAMPLE is HG002, SEQUENCER is novaseq, DEPTH is 100. It's in silico data as SILICO is simuscop (one of the tools supported, see `crate::silico`). The rest of the filename is discarded.
 //! A set of values is defined in `crate::baid2020` for stronger type-checking.
@@ -21,7 +21,7 @@ static RUN_RE: OnceLock<Regex> = OnceLock::new();
 fn run_re() -> &'static Regex {
     RUN_RE.get_or_init(|| {
         Regex::new(
-            r"^(?P<sample>[^-]+)-(?P<sequencer>[^-]+)-(?P<capture>[^-]+)-(?P<depth>[^-.x]+)x(?:-(?P<silico>[^.-]+))?",
+            r"^(?P<sample>[^_]+)_(?P<sequencer>[^_]+)_(?P<capture>[^_]+)_(?P<depth>[^_.x]+)x(?:_(?P<silico>[^._]+))?",
         )
         .unwrap()
     })
@@ -41,15 +41,15 @@ pub fn run_from_filename(fname: &PathBuf) -> Option<Run> {
     })
 }
 
-/// Format a [`Run`] as `SAMPLE-SEQUENCER-CAPTURE-DEPTH{-SILICO}`.
+/// Format a [`Run`] as `SAMPLE_SEQUENCER_CAPTURE_DEPTH{_SILICO}`.
 pub fn run_to_string(run: &Run) -> String {
     let base = format!(
-        "{}-{}-{}-{}x",
+        "{}_{}_{}_{}x",
         run.sample, run.sequencer, run.capture, run.depth
     );
     match &run.silico {
         None => base,
-        Some(s) => format!("{}-{}", base, s),
+        Some(s) => format!("{}_{}", base, s),
     }
 }
 
@@ -82,30 +82,30 @@ mod tests {
 
     #[test]
     fn run_to_string_real() {
-        assert_eq!(run_to_string(&make_run(None)), "HG002-novaseq-agilent-100x");
+        assert_eq!(run_to_string(&make_run(None)), "HG002_novaseq_agilent_100x");
     }
 
     #[test]
     fn run_to_string_silico() {
         assert_eq!(
             run_to_string(&make_run(Some(String::from("simuscop")))),
-            "HG002-novaseq-agilent-100x-simuscop"
+            "HG002_novaseq_agilent_100x_simuscop"
         );
         assert_eq!(
             run_to_string(&make_run(Some(String::from("varben")))),
-            "HG002-novaseq-agilent-100x-varben"
+            "HG002_novaseq_agilent_100x_varben"
         );
     }
 
     #[test]
     fn run_from_filename_real() {
-        let path = PathBuf::from("HG002-novaseq-agilent-100x.vcf.gz");
+        let path = PathBuf::from("HG002_novaseq_agilent_100x.vcf.gz");
         assert_eq!(run_from_filename(&path), Some(make_run(None)));
     }
 
     #[test]
     fn run_from_filename_silico() {
-        let path = PathBuf::from("HG002-novaseq-agilent-100x-simuscop.vcf.gz");
+        let path = PathBuf::from("HG002_novaseq_agilent_100x_simuscop.vcf.gz");
         assert_eq!(
             run_from_filename(&path),
             Some(make_run(Some(String::from("simuscop"))))
@@ -116,10 +116,10 @@ mod tests {
     fn run_from_filename_invalid() {
         let bad = [
             "nomatch.vcf",
-            "HG002novaseq-bad-100x.vcf",
-            "HG002-novaseqbad-100x.vcf",
-            "HG002-novaseqbad-100.vcf",
-            "HG002-novaseq-bad100x.vcf",
+            "HG002novaseq_bad_100x.vcf",
+            "HG002_novaseqbad_100x.vcf",
+            "HG002_novaseqbad_100.vcf",
+            "HG002_novaseq_bad100x.vcf",
         ];
         for b in bad {
             assert_eq!(run_from_filename(&PathBuf::from(b)), None);
