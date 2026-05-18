@@ -1,6 +1,5 @@
 [book]
 authors = ["Alexis Praga"]
 language = "en"
-multilingual = false
 src = "src"
 title = "sherloxome"

@@ -1,5 +1,7 @@
 # Sherloxome
 
+![Real patients](https://github.com/apraga/sherloxome/actions/workflows/giab-col6a1.yml/badge.svg)
+
 A benchmarking tool for validating exome/targeted capture. It serves to prepare testing FASTQ data (real patients or insilico) and compute benchmarking data.
 
 ## Quickstart

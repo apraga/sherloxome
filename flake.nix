@@ -11,12 +11,15 @@
         let
             system = "x86_64-linux";
             pkgs = import nixpkgs { inherit system; };
+            rtg-tools = pkgs.callPackage pkgs/rtg-tools/package.nix {};
             deps = {
                 varben = pkgs.callPackage pkgs/varben/package.nix {};
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
                 bwa = pkgs.bwa;
-                rtg-tools = pkgs.rtg-tools;
-                hap-py = pkgs.hap-py;
+                # Waiting for PR to be merged
+                inherit rtg-tools;
+                # rtg-tools = pkgs.rtg-tools;
+                hap-py = pkgs.callPackage pkgs/hap-py/package.nix { inherit rtg-tools; };
                 samtools = pkgs.samtools;
             };
         in {

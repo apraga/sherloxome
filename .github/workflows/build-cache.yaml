@@ -1,0 +1,20 @@
+name: Build nix cache
+on:
+  push:
+    paths: ['flake.nix', 'flake.lock', 'pkgs/**']
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: cachix/cachix-action@v14
+        with:
+          name: sherloxome
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build .#default | cachix push sherloxome

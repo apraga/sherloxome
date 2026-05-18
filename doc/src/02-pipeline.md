@@ -10,8 +10,8 @@ Sherloxome generates samplesheets compatible with [nf-core/sarek](https://nf-co.
 
 ```csv
 patient,sample,lane,fastq_1,fastq_2
-HG001,HG001-hiseq4000-agilent-50x,1,https://...R1.fastq.gz,https://...R2.fastq.gz
-HG002,HG002-novaseq-idt-75x,1,https://...R1.fastq.gz,https://...R2.fastq.gz
+HG001,HG001_hiseq4000_agilent_50x,1,https://...R1.fastq.gz,https://...R2.fastq.gz
+HG002,HG002_novaseq_idt_75x,1,https://...R1.fastq.gz,https://...R2.fastq.gz
 silico-varben,HG002_nohardclip,1,/path/to/HG002_nohardclip_1.fq.gz,/path/to/HG002_nohardclip_2.fq.gz
 ```
 
@@ -54,9 +54,9 @@ truseq  = "data/capture/truseq-dna-exome.bed"
 
 The `analyze` step infers run metadata (patient, sequencer, capture, depth) from VCF filenames. Sarek names output VCFs using the `sample` column of the samplesheet, so the naming is already correct as long as you use the samplesheet written by `sherloxome setup`.
 
-Expected filename pattern: `{patient}-{sequencer}-{capture}-{depth}.vcf.gz`
+Expected filename pattern: `{patient}_{sequencer}_{capture}_{depth}x.vcf.gz`
 
-Example: `HG002-novaseq-agilent-75x.vcf.gz`
+Example: `HG002_novaseq_agilent_75x.vcf.gz`
 
 ## SLURM example
 

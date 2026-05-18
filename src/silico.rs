@@ -510,7 +510,7 @@ fn insert_variants_varben(
             "-m",
             mut_str,
             "-p",
-            &nb_threads().to_string(),
+            "1",
             "-b",
             bam_str,
             "-r",

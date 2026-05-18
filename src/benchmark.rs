@@ -205,6 +205,10 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
         })
         .collect::<Result<_, _>>()?;
 
+    if dfs.is_empty() {
+        return Err("No summary CSVs found — all runs may have been skipped or failed".into());
+    }
+
     let mut merged = concat(dfs, UnionArgs::default())?.collect()?;
     let out_file = output_dir.join("merged.csv");
     let mut file = std::fs::File::create(out_file.clone())?;
@@ -217,7 +221,7 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
 fn fasta_to_sdf(fasta: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let sdf = fasta.with_extension("sdf");
     if sdf.join("mainIndex").exists() {
-        println!("{} already exists", sdf.display());
+        log::debug!("{} already exists", sdf.display());
     } else if sdf.exists() {
         return Err(format!(
             "SDF directory {} exists but is incomplete; remove it and retry",

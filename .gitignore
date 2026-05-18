@@ -20,6 +20,6 @@ work
 # *.bam
 # *.bai
 *.mut
-test*
 HG002.chr21-hiseq4000-agilent-50x.bam
 HG002.chr21-hiseq4000-agilent-50x_nohardclip.bam
+tests/test-*
