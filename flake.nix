@@ -13,7 +13,7 @@
             pkgs = import nixpkgs { inherit system; };
             rtg-tools = pkgs.callPackage pkgs/rtg-tools/package.nix {};
             deps = {
-                varben = pkgs.callPackage pkgs/varben/package.nix {};
+                varben = pkgs.callPackage pkgs/varben/package.nix { bwa = pkgs.callPackage pkgs/bwa/package.nix {}; };
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
                 bwa = pkgs.callPackage pkgs/bwa/package.nix {};
                 # Waiting for PR to be merged

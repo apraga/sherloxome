@@ -1,14 +1,14 @@
-{ pkgs, stdenv, fetchFromGitHub, lib, makeWrapper }:
+{ pkgs, stdenv, fetchFromGitHub, lib, makeWrapper, bwa ? pkgs.bwa }:
 
 let
   # Bcftools needs perl
-  runtimeInputs  = with pkgs; [
+  runtimeInputs  = [
     bwa
-    bcftools
-    bedtools
-    coreutils
-    gnugrep
-    samtools
+    pkgs.bcftools
+    pkgs.bedtools
+    pkgs.coreutils
+    pkgs.gnugrep
+    pkgs.samtools
   ];
   my-python-packages = p: with p; [
     pysam
@@ -39,7 +39,7 @@ stdenv.mkDerivation {
   '';
   postFixup = ''
     makeWrapper ${my-python}/bin/python $out/bin/muteditor \
-        --set PATH ${lib.makeBinPath runtimeInputs }  \
+        --suffix PATH : ${lib.makeBinPath runtimeInputs }  \
         --add-flags "$out/bin/muteditor.py"
     '';
 }

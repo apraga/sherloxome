@@ -2,13 +2,13 @@
 
 stdenv.mkDerivation {
   pname = "bwa";
-  version = "0.7.17-r1198-dirty";
+  version = "0.7.18";
 
   src = fetchFromGitHub {
     owner = "lh3";
     repo = "bwa";
-    rev = "139f68fc4c3747813783a488aef2adc86626b01b";
-    hash = "sha256-8u35lTK6gBKeapYoIkG9MuJ/pyy/HFA2OiPn+Ml2C6c=";
+    rev = "v0.7.18";
+    hash = "sha256-ITvugdgUUfncDcJjEcBaO8ux2fZ4YPEdg3/i/iePw+0=";
   };
 
   buildInputs = [ zlib ];
