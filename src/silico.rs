@@ -484,7 +484,11 @@ fn insert_variants(
     let outdir_str = outdir_.to_str().ok_or("Invalid output folder")?;
 
     let output = outdir_.join("edit.sorted.bam");
-    if output.exists() {
+    /// If there's file from older run, override them
+    let stale = output.exists()
+        && mut_file.metadata().ok().and_then(|m| m.modified().ok())
+            > output.metadata().ok().and_then(|m| m.modified().ok());
+    if output.exists() && !stale {
         log::debug!("{:?} already exists", output);
     } else {
         let log_path = outdir_.join("varben.log");
