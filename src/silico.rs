@@ -6,11 +6,14 @@ use noodles::bed;
 use noodles::bgzf;
 use noodles::fasta;
 use noodles::vcf;
+use noodles::vcf::header::record::value::{Map, map::Format};
 use noodles::vcf::variant::RecordBuf;
 use noodles::vcf::variant::io::Write as VCFWrite;
 use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::info::field::Value;
+use noodles::vcf::variant::record::samples::keys::key as sample_key;
 use noodles::vcf::variant::record_buf::AlternateBases as AltBasesBuf;
+use noodles::vcf::variant::record_buf::samples::{Keys as SampleKeys, Samples as SamplesBuf, sample::Value as SampleValue};
 use rand::RngExt;
 use rand::prelude::IteratorRandom;
 use std::collections::HashMap;
@@ -257,7 +260,7 @@ pub fn write_varben_as_vcf(
     let bam_stem = bam.file_stem().unwrap().to_string_lossy();
 
     let success_list = varben_dir.join("success_list.txt");
-    let success_vcf = outdir.join(format!("{bam_stem}_success.vcf.gz"));
+    let success_vcf = outdir.join(format!("{bam_stem}_varben.vcf.gz"));
     write_varben_as_vcf_single(success_list, success_vcf, header, fasta)
 }
 
@@ -563,9 +566,16 @@ fn nb_threads() -> usize {
 fn write_varben_as_vcf_single(
     mut_file: PathBuf,
     vcf_out: PathBuf,
-    header: vcf::Header,
+    mut header: vcf::Header,
     fasta: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
+    header.sample_names_mut().insert(String::from("TRUTH"));
+    header
+        .formats_mut()
+        .insert(String::from(sample_key::GENOTYPE), Map::<Format>::from(sample_key::GENOTYPE));
+
+    let gt_keys: SampleKeys = [String::from(sample_key::GENOTYPE)].into_iter().collect();
+
     let mut fasta_reader = fasta::io::indexed_reader::Builder::default().build_from_path(fasta)?;
 
     let reader = BufReader::new(File::open(mut_file)?);
@@ -589,11 +599,16 @@ fn write_varben_as_vcf_single(
         let seq = record.sequence().as_ref();
         let ref_base = std::str::from_utf8(&seq[..1])?.to_uppercase();
 
+        let samples = SamplesBuf::new(
+            gt_keys.clone(),
+            vec![vec![Some(SampleValue::from("0/1"))]],
+        );
         let buf = RecordBuf::builder()
             .set_reference_sequence_name(chrom)
             .set_variant_start(noodles::core::Position::try_from(pos)?)
             .set_reference_bases(ref_base)
             .set_alternate_bases(AltBasesBuf::from(vec![alt.to_string()]))
+            .set_samples(samples)
             .build();
 
         records.push(buf);

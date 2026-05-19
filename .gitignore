@@ -23,3 +23,4 @@ work
 HG002.chr21-hiseq4000-agilent-50x.bam
 HG002.chr21-hiseq4000-agilent-50x_nohardclip.bam
 tests/test-*
+*recal*bam*

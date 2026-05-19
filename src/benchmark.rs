@@ -4,7 +4,6 @@
 //! so files must be named using the conventions established in [`crate::fastqbaid2020`].
 use crate::check_deps;
 use crate::giab;
-use crate::ref_dir;
 use crate::resolve_fasta;
 use crate::run::{Run, run_from_filename, run_to_string};
 use crate::setup::Config; //, RealConfig, SilicoConfig, filter_available_runs};
@@ -142,15 +141,15 @@ fn real_run_to_happy(
 }
 
 /// TODO support fastq generation with simuscop
-/// For silico run, the reference vcf is simply SAMPLE_success.vcf.gz
-/// There is no truth_bed, we simple use the capture
+/// For silico run, the reference vcf is the varben-named VCF in data/exp_raw
+/// There is no truth_bed, we simply use the capture
 fn silico_run_to_happy(
     run: Run,
     query_vcf: PathBuf,
     captures: &HashMap<String, String>,
 ) -> Result<HappyRunSetup, Box<dyn Error>> {
     let prefix = run_to_string(&run);
-    let truth_vcf = ref_dir().join(run.sample).join("_success.vcf.gz");
+    let truth_vcf = PathBuf::from("data/exp_raw").join(format!("{}.vcf.gz", prefix));
     let query_bed = captures
         .get(&run.capture)
         .map(PathBuf::from)
