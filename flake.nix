@@ -15,7 +15,7 @@
             deps = {
                 varben = pkgs.callPackage pkgs/varben/package.nix {};
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
-                bwa = pkgs.bwa;
+                bwa = pkgs.callPackage pkgs/bwa/package.nix {};
                 # Waiting for PR to be merged
                 inherit rtg-tools;
                 # rtg-tools = pkgs.rtg-tools;
