@@ -1,8 +1,9 @@
 {
 
     inputs = {
-        nixpkgs.url = "github:NixOS/nixpkgs/68799d2b3b33ca5a2406d99ec5d67900a1ea658f";
-        # nixpkgs.url = "nixpkgs/nixos-25.11";
+        # nixpkgs.url = "github:NixOS/nixpkgs/68799d2b3b33ca5a2406d99ec5d67900a1ea658f";
+        # Need 25-11 to avoid segfault with bwa
+        nixpkgs.url = "nixpkgs/nixos-25.11";
     };
 
     description = "Exome validator";
