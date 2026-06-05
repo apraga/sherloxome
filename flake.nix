@@ -17,6 +17,7 @@
                 varben = pkgs.callPackage pkgs/varben/package.nix {};
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
                 bwa = pkgs.bwa;
+                bcftools=  pkgs.bcftools;
                 # Waiting for PR to be merged
                 inherit rtg-tools;
                 # rtg-tools = pkgs.rtg-tools;
