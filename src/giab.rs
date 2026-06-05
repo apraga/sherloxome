@@ -57,13 +57,13 @@ const BASE_URL: &str = "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab
 /// GIAB FTP sub-path that is unique to each patient.
 fn url_tail(p: &Patient) -> &'static str {
     match p {
-        Patient::HG001 => "NA12878_HG001/latest/GRCh38",
-        Patient::HG002 => "AshkenazimTrio/HG002_NA24385_son/latest/GRCh38",
-        Patient::HG003 => "AshkenazimTrio/HG003_NA24149_father/latest/GRCh38",
-        Patient::HG004 => "AshkenazimTrio/HG004_NA24143_mother/latest/GRCh38",
-        Patient::HG005 => "ChineseTrio/HG005_NA24631_son/latest/GRCh38",
-        Patient::HG006 => "ChineseTrio/HG006_NA24694_father/latest/GRCh38",
-        Patient::HG007 => "ChineseTrio/HG007_NA24695_mother/latest/GRCh38",
+        Patient::HG001 => "NA12878_HG001/NISTv4.2.1/GRCh38",
+        Patient::HG002 => "AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38",
+        Patient::HG003 => "AshkenazimTrio/HG003_NA24149_father/NISTv4.2.1/GRCh38",
+        Patient::HG004 => "AshkenazimTrio/HG004_NA24143_mother/NISTv4.2.1/GRCh38",
+        Patient::HG005 => "ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38",
+        Patient::HG006 => "ChineseTrio/HG006_NA24694_father/NISTv4.2.1/GRCh38",
+        Patient::HG007 => "ChineseTrio/HG007_NA24695_mother/NISTv4.2.1/GRCh38",
     }
 }
 

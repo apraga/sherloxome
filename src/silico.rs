@@ -13,7 +13,9 @@ use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::info::field::Value;
 use noodles::vcf::variant::record::samples::keys::key as sample_key;
 use noodles::vcf::variant::record_buf::AlternateBases as AltBasesBuf;
-use noodles::vcf::variant::record_buf::samples::{Keys as SampleKeys, Samples as SamplesBuf, sample::Value as SampleValue};
+use noodles::vcf::variant::record_buf::samples::{
+    Keys as SampleKeys, Samples as SamplesBuf, sample::Value as SampleValue,
+};
 use rand::RngExt;
 use rand::prelude::IteratorRandom;
 use std::collections::HashMap;
@@ -487,7 +489,7 @@ fn insert_variants(
     let outdir_str = outdir_.to_str().ok_or("Invalid output folder")?;
 
     let output = outdir_.join("edit.sorted.bam");
-    /// If there's file from older run, override them
+    // If there's file from older run, override them
     let stale = output.exists()
         && mut_file.metadata().ok().and_then(|m| m.modified().ok())
             > output.metadata().ok().and_then(|m| m.modified().ok());
@@ -570,9 +572,10 @@ fn write_varben_as_vcf_single(
     fasta: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     header.sample_names_mut().insert(String::from("TRUTH"));
-    header
-        .formats_mut()
-        .insert(String::from(sample_key::GENOTYPE), Map::<Format>::from(sample_key::GENOTYPE));
+    header.formats_mut().insert(
+        String::from(sample_key::GENOTYPE),
+        Map::<Format>::from(sample_key::GENOTYPE),
+    );
 
     let gt_keys: SampleKeys = [String::from(sample_key::GENOTYPE)].into_iter().collect();
 
@@ -599,10 +602,7 @@ fn write_varben_as_vcf_single(
         let seq = record.sequence().as_ref();
         let ref_base = std::str::from_utf8(&seq[..1])?.to_uppercase();
 
-        let samples = SamplesBuf::new(
-            gt_keys.clone(),
-            vec![vec![Some(SampleValue::from("0/1"))]],
-        );
+        let samples = SamplesBuf::new(gt_keys.clone(), vec![vec![Some(SampleValue::from("0/1"))]]);
         let buf = RecordBuf::builder()
             .set_reference_sequence_name(chrom)
             .set_variant_start(noodles::core::Position::try_from(pos)?)
