@@ -1,4 +1,4 @@
-name: Varben CI
+name: Varben testing on COL6A1
 
 on:
   push:
