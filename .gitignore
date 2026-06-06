@@ -27,3 +27,8 @@ tests/test-*
 output_tiddit
 *.bam
 *.bam.bai
+*.fna.amb
+*.fna.ann
+*.fna.pac
+*.fna.sa
+*.fna.bwt

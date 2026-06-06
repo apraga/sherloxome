@@ -419,7 +419,14 @@ pub fn ensure_bwa_index(fasta: &PathBuf) -> Result<(), Box<dyn Error>> {
         ])
         .status()?;
     if !status.success() {
-        return Err(format!("tar exited with status {status}").into());
+        // Archive is likely corrupt (e.g. interrupted download); remove it so the next run re-downloads.
+        let _ = std::fs::remove_file(&tar_path);
+        return Err(format!(
+            "Failed to extract BWA index archive (tar exited with {status}). \
+             The archive may have been corrupt or incompletely downloaded — \
+             it has been deleted. Re-run setup to download it again."
+        )
+        .into());
     }
     Ok(())
 }

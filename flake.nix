@@ -31,5 +31,8 @@
                     paths = builtins.attrValues deps;
                 };
             };
+            devShells.${system}.default = pkgs.mkShell {
+                packages = builtins.attrValues deps;
+            };
         };
 }

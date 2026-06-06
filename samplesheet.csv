@@ -1,0 +1,2 @@
+patient,sample,lane,fastq_1,fastq_2
+silico-varben,HG002_hiseq4000_agilent-col6a1_50x_varben,1,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_1.fq.gz,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_2.fq.gz
