@@ -47,7 +47,7 @@ fn download_clinvar() -> PathBuf {
 type BedIndex = HashMap<String, Vec<(usize, usize)>>;
 
 /// For each chromosome, store sorted list of (start, end) 0-based half-open intervals
-/// Assubme bed is stored
+/// Assume bed is stored
 fn load_bed(bed: &PathBuf) -> Result<BedIndex, Box<dyn Error>> {
     let mut reader = File::open(bed)
         .map(BufReader::new)
@@ -127,7 +127,7 @@ fn is_snv(record: &vcf::Record) -> bool {
 }
 
 /// Write VCF record to varben format. Assume chromosoes do NOT have a chr prefix
-/// Generate AF betwen 0.4 and 0.6
+/// Output generate heterozygous variant (AF betwen 0.4 and 0.6)
 fn write_varben(
     w: &mut impl Write,
     record: &RecordBuf,
@@ -145,6 +145,39 @@ fn write_varben(
         "{}\t{}\t{}\t{}\tsnv\t{}",
         chrom_chr, pos, pos, af, alt_merged
     )?;
+    Ok(())
+}
+
+/// Write one SNV in simuscop tab-separated variation format (no header line).
+/// Always emits `het` since we sample heterozygous AF from clinvar.
+fn write_simuscop_variant(
+    w: &mut impl Write,
+    record: &RecordBuf,
+    population: &str,
+) -> Result<(), Box<dyn Error>> {
+    let chrom = record.reference_sequence_name();
+    let pos = usize::from(record.variant_start().unwrap());
+    let ref_base = record.reference_bases().to_lowercase();
+    let alt = record
+        .alternate_bases()
+        .iter()
+        .filter_map(|a| a.ok())
+        .next()
+        .unwrap_or(".");
+    writeln!(w, "s\t{population}\t{chrom}\t{pos}\t{ref_base}\t{alt}\thet")?;
+    Ok(())
+}
+
+fn write_sampled_clinvar_simuscop(
+    variants: &[RecordBuf],
+    out: &Path,
+    population: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut w = BufWriter::new(File::create(out)?);
+    for v in variants {
+        write_simuscop_variant(&mut w, v, population)?;
+    }
+    w.flush()?;
     Ok(())
 }
 
@@ -266,18 +299,7 @@ pub fn write_varben_as_vcf(
     write_varben_as_vcf_single(success_list, success_vcf, header, fasta)
 }
 
-/// Helper to write a .vcf.gz
-// fn vcf_writer(
-//     path: &PathBuf,
-//     header: &vcf::Header,
-// ) -> Result<vcf::io::Writer<bgzf::io::Writer<File>>, Box<dyn Error>> {
-//     let mut writer = File::create(path)
-//         .map(bgzf::io::Writer::new)
-//         .map(vcf::io::Writer::new)?;
-//     writer.write_header(header)?;
-//     Ok(writer)
-// }
-
+/// Write a mutation file for varben using sampled clinvar data
 fn write_sampled_clinvar_mut(
     variants: &Vec<RecordBuf>,
     mut_out: &PathBuf,
