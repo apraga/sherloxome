@@ -19,17 +19,20 @@ nb_variants = 2
 # fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
 # Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent-col6a1"
-# A BAM file is alway required. Varben will modify it, simuscop will define a sequencing profile from it
-# Caan be an URL or a local link. 
+# A BAM file is always required. Varben will modify it, simuscop will define a sequencing profile from it.
+# Can be a URL or a local path.
 bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
 
-# Enable pure insilico generation
-fastq = true
-# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller). Required for simuscop profile generation.
+# This section enables simuscop FASTQ generation (remove section to disable)
+[silico.simuscop]
+# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller)
 vcf = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.vcf.gz"
+# Sequencing coverage
+coverage = 50
 
-# Enable fastq generation from a BAM file
-bam = false
+# This section enables varben BAM editing (remove section to disable)
+# [silico.varben]
+# mindepth = 30
 
 # Define here the name of alls captures and the bed file
 [capture]

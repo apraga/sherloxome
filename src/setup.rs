@@ -229,12 +229,12 @@ mod tests {
     fn make_silico(capture: &str) -> SilicoConfig {
         SilicoConfig {
             capture: capture.to_string(),
-            fastq: false,
-            bam: false,
             bam_file: String::new(),
             clinvar: None,
             nb_variants: None,
             outdir: None,
+            simuscop: None,
+            varben: None,
         }
     }
 

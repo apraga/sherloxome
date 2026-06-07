@@ -33,23 +33,37 @@ use std::process::ExitStatus;
 use std::process::{Command, Stdio};
 use std::thread;
 
+/// [silico.simuscop] — presence enables simuscop FASTQ generation
+#[derive(Deserialize, Debug)]
+pub struct SilicoSimuscopConfig {
+    /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller)
+    pub vcf: PathBuf,
+    /// Sequencing coverage
+    pub coverage: u32,
+}
+
+/// [silico.varben] — presence enables varben BAM editing
+#[derive(Deserialize, Debug)]
+pub struct SilicoVarbenConfig {
+    /// Minimum read depth required to edit a position (--mindepth)
+    pub mindepth: Option<u32>,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct SilicoConfig {
     pub capture: String,
-    /// Enable pure insilico fatq generation with simuscop
-    pub fastq: bool,
-    /// Enable fastq generation from a BAM file with varben
-    pub bam: bool,
-    /// A BAM file is alway required. Varben will modify it, simuscop will define a sequencing profile from it
+    /// A BAM file is always required. Varben will modify it, simuscop will define a sequencing profile from it.
     pub bam_file: String,
-    /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller). Required for simuscop profile generation.
-    pub vcf: PathBuf,
     /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
     pub clinvar: Option<PathBuf>,
     /// Number of clinvar variants to sample to insert in the BAM
     pub nb_variants: Option<u32>,
     /// Output directory for intermediate files; defaults to "data/exp_raw".
     pub outdir: Option<PathBuf>,
+    /// Simuscop FASTQ generation config ([silico.simuscop]); absence disables it.
+    pub simuscop: Option<SilicoSimuscopConfig>,
+    /// Varben BAM editing config ([silico.varben]); absence disables it.
+    pub varben: Option<SilicoVarbenConfig>,
 }
 
 /// Generate controls from clinvar data and either a BAM file (real patient) or 100% in silico
@@ -79,22 +93,17 @@ pub fn generate_controls(
     )?;
     let bam_path = resolve_bam(&silico.bam_file, &outdir)?;
 
-    if silico.bam {
+    if let Some(varben) = &silico.varben {
         let (fq1, fq2) = generate_controls_bam(
-            &bam_path, &bed, &capture, &fasta, &variants, header, &outdir,
+            &bam_path, &bed, &capture, &fasta, &variants, header, varben.mindepth, &outdir,
         )?;
         rows.push(silico_row("varben", fq1, fq2));
     }
-    if silico.fastq {
+    if let Some(simuscop) = &silico.simuscop {
         let (fq1, fq2) = generate_controls_fastq(
-            &bam_path,
-            &bed,
-            &capture,
-            &fasta,
-            &silico.vcf,
-            &variants,
-            &outdir,
+            &bam_path, &bed, &capture, &fasta, &simuscop.vcf, &variants, &outdir, simuscop.coverage,
         )?;
+        rows.push(silico_row("simuscop", fq1, fq2));
     }
     Ok(rows)
 }
@@ -108,12 +117,65 @@ fn generate_controls_fastq(
     vcf: &PathBuf,
     variants: &Vec<RecordBuf>,
     outdir: &PathBuf,
+    coverage: u32,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     let profile_dir = ensure_profile(bam, vcf, fasta, bed, outdir)?;
-    let mut_out = outdir.join(format!("clinvar_{capture}.simuscop"));
-    write_simuscop_input(&variants, &mut_out, "test")?;
-    // TODO: call simuReads with profile_dir and mut_out
-    Err("simuReads not yet implemented".into())
+
+    let variation = outdir.join(format!("clinvar_{capture}.simuscop"));
+    write_simuscop_input(variants, &variation, capture)?;
+
+    let simuscop_outdir = outdir.join(format!("simuscop_{capture}"));
+    std::fs::create_dir_all(&simuscop_outdir)?;
+
+    let config_path = outdir.join(format!("simuscop_{capture}.conf"));
+    write_simuscop_config(&config_path, fasta, &profile_dir, &variation, bed, capture, &simuscop_outdir, coverage)?;
+
+    run_simu_reads(&config_path, capture, &simuscop_outdir)
+}
+
+/// Write a simuReads config file
+pub fn write_simuscop_config(
+    config_path: &Path,
+    fasta: &Path,
+    profile_dir: &Path,
+    variation: &Path,
+    bed: &Path,
+    name: &str,
+    output_dir: &Path,
+    coverage: u32,
+) -> Result<(), Box<dyn Error>> {
+    let threads = nb_threads();
+    let mut w = BufWriter::new(File::create(config_path)?);
+    writeln!(w, "ref = {}", fasta.display())?;
+    writeln!(w, "profile = {}", profile_dir.display())?;
+    writeln!(w, "variation = {}", variation.display())?;
+    writeln!(w, "target = {}", bed.display())?;
+    writeln!(w, "name = {}", name)?;
+    writeln!(w, "output = {}", output_dir.display())?;
+    writeln!(w, "layout = PE")?;
+    writeln!(w, "threads = {}", threads)?;
+    writeln!(w, "coverage = {}", coverage)?;
+    w.flush()?;
+    Ok(())
+}
+
+/// Run simuReads with the given config. Returns (fq1, fq2) output paths.
+fn run_simu_reads(
+    config_path: &Path,
+    name: &str,
+    output_dir: &Path,
+) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+    let status = Command::new("simuReads")
+        .arg(config_path.to_str().ok_or("Invalid simuReads config path")?)
+        .status()?;
+
+    if !status.success() {
+        return Err(format!("simuReads exited with status {status}").into());
+    }
+
+    let fq1 = output_dir.join(format!("{name}_1.fq.gz"));
+    let fq2 = output_dir.join(format!("{name}_2.fq.gz"));
+    Ok((fq1, fq2))
 }
 
 /// Build a seqToProfile sequencing profile from a normal BAM.
@@ -168,6 +230,7 @@ fn generate_controls_bam(
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
     header: vcf::Header,
+    mindepth: Option<u32>,
     outdir: &PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     std::fs::create_dir_all(&outdir)?;
@@ -186,7 +249,7 @@ fn generate_controls_bam(
         Ok((fq1, fq2))
     } else {
         log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(&bam, &bed, capture, fasta, variants, header)?;
+        let new_bam = edit_bam(&bam, &bed, capture, fasta, variants, header, mindepth)?;
         bam_to_fastq(new_bam, fq1, fq2)
     }
 }
@@ -640,6 +703,7 @@ pub fn edit_bam(
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
     header: vcf::Header,
+    mindepth: Option<u32>,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
@@ -649,7 +713,7 @@ pub fn edit_bam(
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
     write_varben_input(&variants, &mut_out)?;
     ensure_bwa_index(&fasta)?;
-    let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta)?;
+    let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta, mindepth)?;
 
     write_varben_as_vcf(bam, header, outdir, &fasta)?;
 
@@ -664,6 +728,7 @@ fn insert_variants(
     bam: PathBuf,
     outdir: PathBuf,
     fasta: &PathBuf,
+    mindepth: Option<u32>,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir_ = outdir.join("varben");
     std::fs::create_dir_all(&outdir_)?;
@@ -682,7 +747,7 @@ fn insert_variants(
         log::debug!("{:?} already exists", output);
     } else {
         let log_path = outdir_.join("varben.log");
-        let status = insert_variants_varben(mut_str, bam_str, fasta_str, outdir_str, log_path)?;
+        let status = insert_variants_varben(mut_str, bam_str, fasta_str, outdir_str, mindepth, log_path)?;
         if !status.success() {
             return Err(format!("muteditor exited with status {status}").into());
         }
@@ -695,29 +760,25 @@ fn insert_variants_varben(
     bam_str: &str,
     fasta_str: &str,
     outdir_str: &str,
+    mindepth: Option<u32>,
     log_path: PathBuf,
 ) -> Result<ExitStatus, std::io::Error> {
     let log_file = File::create(&log_path)?;
 
-    Command::new("muteditor")
-        .args([
-            "-m",
-            mut_str,
-            "-p",
-            "1",
-            "-b",
-            bam_str,
-            "-r",
-            fasta_str,
-            "--aligner",
-            "bwa",
-            "--alignerIndex",
-            fasta_str,
-            "-o",
-            outdir_str,
-        ])
-        .stdout(Stdio::from(log_file))
-        .status()
+    let mut cmd = Command::new("muteditor");
+    cmd.args([
+        "-m", mut_str,
+        "-p", "1",
+        "-b", bam_str,
+        "-r", fasta_str,
+        "--aligner", "bwa",
+        "--alignerIndex", fasta_str,
+        "-o", outdir_str,
+    ]);
+    if let Some(depth) = mindepth {
+        cmd.args(["--mindepth", &depth.to_string()]);
+    }
+    cmd.stdout(Stdio::from(log_file)).status()
 }
 /// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
 /// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
@@ -812,4 +873,62 @@ fn write_varben_as_vcf_single(
 
     log::debug!("Wrote {} variants to {:?}", records.len(), vcf_out);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn simuscop_config_has_required_fields() {
+        let dir = std::env::temp_dir().join("simuscop_config_test");
+        fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("test.conf");
+
+        write_simuscop_config(
+            &config_path,
+            Path::new("/ref/genome.fa"),
+            Path::new("/data/sample.profile"),
+            Path::new("/data/clinvar.simuscop"),
+            Path::new("/data/capture.bed"),
+            "agilent-col6a1",
+            Path::new("/data/simuscop_out"),
+            50,
+        )
+        .unwrap();
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("ref = /ref/genome.fa"), "missing ref");
+        assert!(content.contains("profile = /data/sample.profile"), "missing profile");
+        assert!(content.contains("variation = /data/clinvar.simuscop"), "missing variation");
+        assert!(content.contains("target = /data/capture.bed"), "missing target");
+        assert!(content.contains("name = agilent-col6a1"), "missing name");
+        assert!(content.contains("output = /data/simuscop_out"), "missing output");
+        assert!(content.contains("layout = PE"), "missing layout");
+        assert!(content.contains("coverage = 50"), "missing coverage");
+        assert!(content.contains("threads = "), "missing threads");
+    }
+
+    #[test]
+    fn simuscop_config_coverage_matches_input() {
+        let dir = std::env::temp_dir().join("simuscop_coverage_test");
+        fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("test.conf");
+
+        write_simuscop_config(
+            &config_path,
+            Path::new("/ref/genome.fa"),
+            Path::new("/profile"),
+            Path::new("/variation"),
+            Path::new("/bed"),
+            "sample",
+            Path::new("/out"),
+            100,
+        )
+        .unwrap();
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("coverage = 100"));
+    }
 }
