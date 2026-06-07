@@ -42,6 +42,8 @@ pub struct SilicoConfig {
     pub bam: bool,
     /// A BAM file is alway required. Varben will modify it, simuscop will define a sequencing profile from it
     pub bam_file: String,
+    /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller). Required for simuscop profile generation.
+    pub vcf: PathBuf,
     /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
     pub clinvar: Option<PathBuf>,
     /// Number of clinvar variants to sample to insert in the BAM
@@ -58,7 +60,7 @@ pub fn generate_controls(
     capture: &str,
     fasta: PathBuf,
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
-    check_deps(&["bwa", "samtools", "muteditor"]);
+    check_deps(&["bwa", "samtools", "muteditor", "seqToProfile"]);
 
     let outdir = silico
         .outdir
@@ -78,13 +80,21 @@ pub fn generate_controls(
     let bam_path = resolve_bam(&silico.bam_file, &outdir)?;
 
     if silico.bam {
-        let (fq1, fq2) =
-            generate_controls_bam(&bam_path, &bed, &capture, &fasta, &variants, header, &outdir)?;
+        let (fq1, fq2) = generate_controls_bam(
+            &bam_path, &bed, &capture, &fasta, &variants, header, &outdir,
+        )?;
         rows.push(silico_row("varben", fq1, fq2));
     }
     if silico.fastq {
-        let (fq1, fq2) =
-            generate_controls_fastq(&bam_path, &bed, &capture, &fasta, &variants, &outdir)?;
+        let (fq1, fq2) = generate_controls_fastq(
+            &bam_path,
+            &bed,
+            &capture,
+            &fasta,
+            &silico.vcf,
+            &variants,
+            &outdir,
+        )?;
     }
     Ok(rows)
 }
@@ -95,13 +105,59 @@ fn generate_controls_fastq(
     bed: &PathBuf,
     capture: &str,
     fasta: &PathBuf,
+    vcf: &PathBuf,
     variants: &Vec<RecordBuf>,
     outdir: &PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    // TODO generate profile
+    let profile_dir = ensure_profile(bam, vcf, fasta, bed, outdir)?;
     let mut_out = outdir.join(format!("clinvar_{capture}.simuscop"));
     write_simuscop_input(&variants, &mut_out, "test")?;
-    Err("FASTQ generation not implemented".into())
+    // TODO: call simuReads with profile_dir and mut_out
+    Err("simuReads not yet implemented".into())
+}
+
+/// Build a seqToProfile sequencing profile from a normal BAM.
+/// The profile directory is derived from the BAM stem and reused on subsequent runs.
+fn ensure_profile(
+    bam: &PathBuf,
+    vcf: &PathBuf,
+    fasta: &PathBuf,
+    bed: &PathBuf,
+    outdir: &PathBuf,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
+    let profile_dir = outdir.join(format!("{bam_stem}.profile"));
+
+    if profile_dir.exists() {
+        log::debug!("Reusing existing profile: {:?}", profile_dir);
+        return Ok(profile_dir);
+    }
+
+    std::fs::create_dir_all(&profile_dir)?;
+    log::info!("Generating sequencing profile with seqToProfile");
+
+    let status = Command::new("seqToProfile")
+        .args([
+            "-b",
+            bam.to_str().ok_or("Invalid BAM path")?,
+            "-v",
+            vcf.to_str().ok_or("Invalid VCF path")?,
+            "-r",
+            fasta.to_str().ok_or("Invalid FASTA path")?,
+            "-t",
+            bed.to_str().ok_or("Invalid BED path")?,
+            "-o",
+            profile_dir.to_str().ok_or("Invalid profile dir path")?,
+        ])
+        .status()?;
+
+    if !status.success() {
+        // Remove the empty directory so the next run retries cleanly
+        let _ = std::fs::remove_dir(&profile_dir);
+        return Err(format!("seqToProfile exited with status {status}").into());
+    }
+
+    Ok(profile_dir)
 }
 
 /// Generate controls from a BAM file and returns 2 fastq
@@ -386,10 +442,7 @@ fn read_vcf(path: &PathBuf) -> Result<(Vec<RecordBuf>, vcf::Header), Box<dyn Err
         .map(bgzf::io::Reader::new)
         .map(vcf::io::Reader::new)?;
     let header = reader.read_header()?;
-    let records = reader
-        .record_bufs(&header)
-        .filter_map(|r| r.ok())
-        .collect();
+    let records = reader.record_bufs(&header).filter_map(|r| r.ok()).collect();
     Ok((records, header))
 }
 

@@ -11,22 +11,25 @@ sequencers = ["hiseq4000"] #, "novaseq"]
 
 # Generate control data from sampled clinvar. Result will be a fastq in data/exp_raw
 [silico]
-# Capture kit name (the BED must be defined in [capture] below)
-capture = "agilent-col6a1"
-# A BAM file is alway required. Varben will modify it, simuscop will define a sequencing profile from it
-# Caan be an URL or a local link. 
-bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
-# Enable pure insilico generation
-fastq = true
-# Enable fastq generation from a BAM file
-bam = true
-# Required for generating a bam file
 # VCF containing clinvar variants. If not set, the VCF will be downloaded from NCBI
 clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
 # Number of random clinvar variants to insert into the BAM file. Default is 1000
 nb_variants = 2
 # URL to fasta, or link to local version, otherwise download it from NCBI
 # fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
+# Capture kit name (the BED must be defined in [capture] below)
+capture = "agilent-col6a1"
+# A BAM file is alway required. Varben will modify it, simuscop will define a sequencing profile from it
+# Caan be an URL or a local link. 
+bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
+
+# Enable pure insilico generation
+fastq = true
+# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller). Required for simuscop profile generation.
+vcf = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.vcf.gz"
+
+# Enable fastq generation from a BAM file
+bam = false
 
 # Define here the name of alls captures and the bed file
 [capture]
