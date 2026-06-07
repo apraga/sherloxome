@@ -21,12 +21,15 @@ nb_variants = 2
 capture = "agilent-col6a1"
 # A BAM file is always required. Varben will modify it, simuscop will define a sequencing profile from it.
 # Can be a URL or a local path.
-bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
+bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip.bam"
 
 # This section enables simuscop FASTQ generation (remove section to disable)
 [silico.simuscop]
-# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller)
-vcf = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.vcf.gz"
+# Pre-built seqToProfile profile directory. If set, seqToProfile is skipped.
+# profile = "data/ref/my_sample.profile"
+# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
+# Required when profile is absent; seqToProfile is run to build the profile.
+vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
 # Sequencing coverage
 coverage = 50
 

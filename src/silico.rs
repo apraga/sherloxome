@@ -36,8 +36,11 @@ use std::thread;
 /// [silico.simuscop] — presence enables simuscop FASTQ generation
 #[derive(Deserialize, Debug)]
 pub struct SilicoSimuscopConfig {
-    /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller)
-    pub vcf: PathBuf,
+    /// Path to a pre-built seqToProfile profile directory. Mutually exclusive with `vcf`.
+    pub profile: Option<PathBuf>,
+    /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
+    /// Required when `profile` is absent; seqToProfile is run to build the profile.
+    pub vcf: Option<PathBuf>,
     /// Sequencing coverage
     pub coverage: u32,
 }
@@ -101,25 +104,36 @@ pub fn generate_controls(
     }
     if let Some(simuscop) = &silico.simuscop {
         let (fq1, fq2) = generate_controls_fastq(
-            &bam_path, &bed, &capture, &fasta, &simuscop.vcf, &variants, &outdir, simuscop.coverage,
+            &bam_path, &bed, &capture, &fasta,
+            simuscop.vcf.as_ref(), simuscop.profile.as_ref(),
+            &variants, &outdir, simuscop.coverage,
         )?;
         rows.push(silico_row("simuscop", fq1, fq2));
     }
     Ok(rows)
 }
 
-/// Generate controls into a in-silico FASTQ. The BAM file is needed to generate a sequencing profile
+/// Generate controls into a in-silico FASTQ.
+/// Either `profile` (pre-built directory) or `vcf` (runs seqToProfile) must be provided.
 fn generate_controls_fastq(
     bam: &PathBuf,
     bed: &PathBuf,
     capture: &str,
     fasta: &PathBuf,
-    vcf: &PathBuf,
+    vcf: Option<&PathBuf>,
+    profile: Option<&PathBuf>,
     variants: &Vec<RecordBuf>,
     outdir: &PathBuf,
     coverage: u32,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let profile_dir = ensure_profile(bam, vcf, fasta, bed, outdir)?;
+    let profile_dir = if let Some(p) = profile {
+        p.clone()
+    } else if let Some(v) = vcf {
+        ensure_profile(bam, v, fasta, bed, outdir)?
+    } else {
+        log::error!("[silico.simuscop] requires either `profile` or `vcf`");
+        return Err("[silico.simuscop] requires either `profile` or `vcf`".into());
+    };
 
     let variation = outdir.join(format!("clinvar_{capture}.simuscop"));
     write_simuscop_input(variants, &variation, capture)?;
