@@ -68,7 +68,7 @@ pub fn generate_controls(
     let mut rows: Vec<SamplesheetRow> = Vec::new();
 
     let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
-    let variants = sample_clinvar(
+    let (variants, header) = sample_clinvar(
         silico.clinvar.clone(),
         PathBuf::from(bed.clone()),
         50,
@@ -79,7 +79,7 @@ pub fn generate_controls(
 
     if silico.bam {
         let (fq1, fq2) =
-            generate_controls_bam(&bam_path, &bed, &capture, &fasta, &variants, &outdir)?;
+            generate_controls_bam(&bam_path, &bed, &capture, &fasta, &variants, header, &outdir)?;
         rows.push(silico_row("varben", fq1, fq2));
     }
     if silico.fastq {
@@ -111,6 +111,7 @@ fn generate_controls_bam(
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
+    header: vcf::Header,
     outdir: &PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     std::fs::create_dir_all(&outdir)?;
@@ -129,7 +130,7 @@ fn generate_controls_bam(
         Ok((fq1, fq2))
     } else {
         log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(&bam, &bed, capture, fasta, variants)?;
+        let new_bam = edit_bam(&bam, &bed, capture, fasta, variants, header)?;
         bam_to_fastq(new_bam, fq1, fq2)
     }
 }
@@ -342,7 +343,7 @@ pub fn sample_clinvar(
     spacing: u32,
     nb_variants: Option<u32>,
     vcf_out: PathBuf,
-) -> Result<Vec<RecordBuf>, Box<dyn Error>> {
+) -> Result<(Vec<RecordBuf>, vcf::Header), Box<dyn Error>> {
     let clinvar_path = match clinvar_vcf {
         Some(p) => p,
         None => download_clinvar(),
@@ -365,9 +366,8 @@ pub fn sample_clinvar(
             "Skip sampling clinvar as output files already exists: {:?}",
             vcf_out
         );
-        // TODO read clinvar data
-        let variants = read_vcf(&vcf_out);
-        Ok(variants)
+        let (variants, header) = read_vcf(&vcf_out)?;
+        Ok((variants, header))
     } else {
         log::debug!("Sampling {n} variants for insertion");
         let mut rng = rand::rng();
@@ -376,8 +376,21 @@ pub fn sample_clinvar(
 
         write_sampled_clinvar_vcf(&variants, &header, &vcf_out)?;
         log::debug!("Wrote {:?}", vcf_out);
-        Ok(variants)
+        Ok((variants, header))
     }
+}
+
+/// Read a bgzf-compressed VCF and return all records and the header
+fn read_vcf(path: &PathBuf) -> Result<(Vec<RecordBuf>, vcf::Header), Box<dyn Error>> {
+    let mut reader = File::open(path)
+        .map(bgzf::io::Reader::new)
+        .map(vcf::io::Reader::new)?;
+    let header = reader.read_header()?;
+    let records = reader
+        .record_bufs(&header)
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok((records, header))
 }
 
 /// Assume there is no chr prefix for chromosome
@@ -573,6 +586,7 @@ pub fn edit_bam(
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
+    header: vcf::Header,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
