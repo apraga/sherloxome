@@ -9,15 +9,17 @@ depths = [50] #, 75, 100]
 captures = ["agilent"] #, "idt", "truseq"]
 sequencers = ["hiseq4000"] #, "novaseq"]
 
-# Insert controls into a single patient BAM or generate in-silico fastq
-# Output will be in data/exp_raw
+# Generate control data from sampled clinvar. Result will be a fastq in data/exp_raw
 [silico]
 # Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent-col6a1"
-# Generate a fastq fully in silico
+# A BAM file is alway required. Varben will modify it, simuscop will define a sequencing profile from it
+# Caan be an URL or a local link. 
+bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
+# Enable pure insilico generation
 fastq = true
-# Either an URL or a local link to insert variants in a BAM file
-bam = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"
+# Enable fastq generation from a BAM file
+bam = true
 # Required for generating a bam file
 # VCF containing clinvar variants. If not set, the VCF will be downloaded from NCBI
 clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"

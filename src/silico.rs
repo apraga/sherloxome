@@ -1,5 +1,7 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
+use crate::setup::{SamplesheetRow, silico_row};
+use crate::{check_deps, resolve_bam};
 use crate::{download_blocking, ref_dir};
 use log;
 use noodles::bed;
@@ -18,6 +20,7 @@ use noodles::vcf::variant::record_buf::samples::{
 };
 use rand::RngExt;
 use rand::prelude::IteratorRandom;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -29,6 +32,107 @@ use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::process::{Command, Stdio};
 use std::thread;
+
+#[derive(Deserialize, Debug)]
+pub struct SilicoConfig {
+    pub capture: String,
+    /// Enable pure insilico fatq generation with simuscop
+    pub fastq: bool,
+    /// Enable fastq generation from a BAM file with varben
+    pub bam: bool,
+    /// A BAM file is alway required. Varben will modify it, simuscop will define a sequencing profile from it
+    pub bam_file: String,
+    /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
+    pub clinvar: Option<PathBuf>,
+    /// Number of clinvar variants to sample to insert in the BAM
+    pub nb_variants: Option<u32>,
+    /// Output directory for intermediate files; defaults to "data/exp_raw".
+    pub outdir: Option<PathBuf>,
+}
+
+/// Generate controls from clinvar data and either a BAM file (real patient) or 100% in silico
+/// Returns a list of samplesheet rows for writing
+pub fn generate_controls(
+    silico: &SilicoConfig,
+    bed: PathBuf,
+    capture: &str,
+    fasta: PathBuf,
+) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
+    check_deps(&["bwa", "samtools", "muteditor"]);
+
+    let outdir = silico
+        .outdir
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("data/exp_raw"));
+
+    let mut rows: Vec<SamplesheetRow> = Vec::new();
+
+    let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
+    let variants = sample_clinvar(
+        silico.clinvar.clone(),
+        PathBuf::from(bed.clone()),
+        50,
+        silico.nb_variants,
+        vcf_out,
+    )?;
+    let bam_path = resolve_bam(&silico.bam_file, &outdir)?;
+
+    if silico.bam {
+        let (fq1, fq2) =
+            generate_controls_bam(&bam_path, &bed, &capture, &fasta, &variants, &outdir)?;
+        rows.push(silico_row("varben", fq1, fq2));
+    }
+    if silico.fastq {
+        let (fq1, fq2) =
+            generate_controls_fastq(&bam_path, &bed, &capture, &fasta, &variants, &outdir)?;
+    }
+    Ok(rows)
+}
+
+/// Generate controls into a in-silico FASTQ. The BAM file is needed to generate a sequencing profile
+fn generate_controls_fastq(
+    bam: &PathBuf,
+    bed: &PathBuf,
+    capture: &str,
+    fasta: &PathBuf,
+    variants: &Vec<RecordBuf>,
+    outdir: &PathBuf,
+) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+    // TODO generate profile
+    let mut_out = outdir.join(format!("clinvar_{capture}.simuscop"));
+    write_simuscop_input(&variants, &mut_out, "test")?;
+    Err("FASTQ generation not implemented".into())
+}
+
+/// Generate controls from a BAM file and returns 2 fastq
+fn generate_controls_bam(
+    bam: &PathBuf,
+    bed: &PathBuf,
+    capture: &str,
+    fasta: &PathBuf,
+    variants: &Vec<RecordBuf>,
+    outdir: &PathBuf,
+) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+    std::fs::create_dir_all(&outdir)?;
+
+    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
+    let bam_parent = bam.parent().unwrap_or(Path::new("."));
+    let fq1 = bam_parent.join(format!("{bam_stem}_1.fq.gz"));
+    let fq2 = bam_parent.join(format!("{bam_stem}_2.fq.gz"));
+
+    if fq1.exists() && fq2.exists() {
+        log::info!(
+            "Skipping BAM editing as output fastq already exists {:?}, {:?}",
+            fq1,
+            fq2
+        );
+        Ok((fq1, fq2))
+    } else {
+        log::info!("Editing BAM to insert control");
+        let new_bam = edit_bam(&bam, &bed, capture, fasta, variants)?;
+        bam_to_fastq(new_bam, fq1, fq2)
+    }
+}
 
 fn download_clinvar() -> PathBuf {
     log::debug!("Downloading clinvar vcf...");
@@ -128,11 +232,8 @@ fn is_snv(record: &vcf::Record) -> bool {
 
 /// Write VCF record to varben format. Assume chromosoes do NOT have a chr prefix
 /// Output generate heterozygous variant (AF betwen 0.4 and 0.6)
-fn write_varben(
-    w: &mut impl Write,
-    record: &RecordBuf,
-    rng: &mut impl RngExt,
-) -> Result<(), Box<dyn Error>> {
+fn write_varben(w: &mut impl Write, record: &RecordBuf) -> Result<(), Box<dyn Error>> {
+    let mut rng = rand::rng();
     let af: f64 = rng.random_range(0.4..0.6);
     let chrom_raw = record.reference_sequence_name();
     let chrom_nb = chrom_raw.strip_prefix("chr").unwrap_or(chrom_raw);
@@ -153,7 +254,7 @@ fn write_varben(
 fn write_simuscop_variant(
     w: &mut impl Write,
     record: &RecordBuf,
-    population: &str,
+    sample: &str,
 ) -> Result<(), Box<dyn Error>> {
     let chrom = record.reference_sequence_name();
     let pos = usize::from(record.variant_start().unwrap());
@@ -164,18 +265,19 @@ fn write_simuscop_variant(
         .filter_map(|a| a.ok())
         .next()
         .unwrap_or(".");
-    writeln!(w, "s\t{population}\t{chrom}\t{pos}\t{ref_base}\t{alt}\thet")?;
+    writeln!(w, "s\t{sample}\t{chrom}\t{pos}\t{ref_base}\t{alt}\thet")?;
     Ok(())
 }
 
-fn write_sampled_clinvar_simuscop(
+/// Write simuscop input file from a list of variant
+fn write_simuscop_input(
     variants: &[RecordBuf],
     out: &Path,
-    population: &str,
+    sample: &str,
 ) -> Result<(), Box<dyn Error>> {
     let mut w = BufWriter::new(File::create(out)?);
     for v in variants {
-        write_simuscop_variant(&mut w, v, population)?;
+        write_simuscop_variant(&mut w, v, sample)?;
     }
     w.flush()?;
     Ok(())
@@ -191,7 +293,8 @@ fn chrom_order(chrom: &str) -> (u8, u32) {
     }
 }
 
-/// Sample clinvar variant and prefix "chr" to chromosome names
+/// Sample clinvar variant randomly.
+/// Prefix "chr" to chromosome names
 fn sample_clinvar_variants(
     reader: &mut vcf::io::Reader<bgzf::io::Reader<File>>,
     header: &vcf::Header,
@@ -229,31 +332,42 @@ fn sort_by_chromosome(variants: &mut Vec<RecordBuf>) {
     });
 }
 
-/// Select n clinvar pathogenic SNV inside the capture kit 50bp apart.
-/// Output is both a mutation file for varben and a VCF (hardcoded into data/exp_raw/clinvar_$CAPTURE)
+/// Select n clinvar pathogenic SNV inside the capture kit 50bp apart
+/// Output is a list of variant. Variants are also written in a data/exp_raw/clinvar_$CAPTURE.vcf
 /// The most efficient way is to parse clinvar once to get variant in the capture kit and 50bp apart.
 /// In a second pass, sample randomly n of them.
 pub fn sample_clinvar(
-    clinvar_vcf: PathBuf,
+    clinvar_vcf: Option<PathBuf>,
     bed: PathBuf,
     spacing: u32,
-    n: u32,
+    nb_variants: Option<u32>,
     vcf_out: PathBuf,
-    mut_out: PathBuf,
-) -> Result<vcf::Header, Box<dyn Error>> {
+) -> Result<Vec<RecordBuf>, Box<dyn Error>> {
+    let clinvar_path = match clinvar_vcf {
+        Some(p) => p,
+        None => download_clinvar(),
+    };
+
+    let n = match nb_variants {
+        Some(n) => n,
+        None => 1000,
+    };
+
     let capture = load_bed(&bed)?;
-    let mut reader = File::open(&clinvar_vcf)
+    let mut reader = File::open(&clinvar_path)
         .map(bgzf::io::Reader::new)
         .map(vcf::io::Reader::new)
         .expect("Failed to open clinvar file");
     let header = reader.read_header()?;
 
-    if vcf_out.exists() && mut_out.exists() {
+    if vcf_out.exists() {
         log::debug!(
-            "Skip sampling clinvar as output files already exists: {:?} and {:?}",
-            vcf_out,
-            mut_out
+            "Skip sampling clinvar as output files already exists: {:?}",
+            vcf_out
         );
+        // TODO read clinvar data
+        let variants = read_vcf(&vcf_out);
+        Ok(variants)
     } else {
         log::debug!("Sampling {n} variants for insertion");
         let mut rng = rand::rng();
@@ -261,10 +375,9 @@ pub fn sample_clinvar(
             sample_clinvar_variants(&mut reader, &header, &capture, spacing, n, &mut rng);
 
         write_sampled_clinvar_vcf(&variants, &header, &vcf_out)?;
-        write_sampled_clinvar_mut(&variants, &mut_out, &mut rng)?;
-        log::debug!("Wrote {:?} and {:?}", vcf_out, mut_out);
+        log::debug!("Wrote {:?}", vcf_out);
+        Ok(variants)
     }
-    Ok(header)
 }
 
 /// Assume there is no chr prefix for chromosome
@@ -300,17 +413,13 @@ pub fn write_varben_as_vcf(
 }
 
 /// Write a mutation file for varben using sampled clinvar data
-fn write_sampled_clinvar_mut(
-    variants: &Vec<RecordBuf>,
-    mut_out: &PathBuf,
-    rng: &mut impl RngExt,
-) -> Result<(), Box<dyn Error>> {
+fn write_varben_input(variants: &Vec<RecordBuf>, mut_out: &PathBuf) -> Result<(), Box<dyn Error>> {
     // Prepare mutation file
     let mut varben_w = BufWriter::new(File::create(&mut_out)?);
     writeln!(varben_w, "#chrom\tstart\tend\tAF\ttype\talt")?;
 
     for v in variants {
-        write_varben(&mut varben_w, v, rng)?;
+        write_varben(&mut varben_w, v)?;
     }
     varben_w.flush()?;
     Ok(())
@@ -462,36 +571,16 @@ pub fn edit_bam(
     bam: &PathBuf,
     bed: &PathBuf,
     capture: &str,
-    fasta: PathBuf,
-    clinvar_vcf: Option<PathBuf>,
-    nb_variants: Option<u32>,
+    fasta: &PathBuf,
+    variants: &Vec<RecordBuf>,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
     std::fs::create_dir_all(&outdir)?;
     index_bam(bam)?;
+
     let bam_cleaned = remove_hard_clips(bam)?;
-
-    let clinvar_path = match clinvar_vcf {
-        Some(p) => p,
-        None => download_clinvar(),
-    };
-
-    let n = match nb_variants {
-        Some(n) => n,
-        None => 1000,
-    };
-
-    // sample n clinvar variants 50bp apart
-    let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
-    let header = sample_clinvar(
-        clinvar_path,
-        PathBuf::from(bed),
-        50,
-        n,
-        vcf_out,
-        mut_out.clone(),
-    )?;
+    write_varben_input(&variants, &mut_out)?;
     ensure_bwa_index(&fasta)?;
     let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta)?;
 

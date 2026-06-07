@@ -1,28 +1,27 @@
 //! Setup data before the pipeline for either real patients or insilico data:
 //! - download all reference FASTQ for real patients and BED in a directory.
-//! - generate in silico FASTQ from clinvar data [`crate::silico`]
-//!   - insert variants into a real BAM
-//!   - generate FASTQ directly from a list of variants (simuscop)
+//! - generate in silico FASTQ from clinvar data [`crate::silico`] by either
+//!   - inserting variants into a real BAM
+//!   - generatingfFASTQ directly from a list of variants (simuscop)
 //! - generate a samplesheet for sarek.
 //!
 //! At least one configuration should be set (real patients or insilico data)
 
 use crate::baid2020::{Capture, Sequencer};
 use crate::baid2020::{available, real_row};
-use crate::check_deps;
 use crate::download_blocking;
 use crate::giab::{Patient, bed_url, tbi_url, vcf_url};
 use crate::giab::{bed_filename, tbi_path, vcf_filename};
+use crate::resolve_fasta;
 use crate::run::Run;
 use crate::silico::*;
-use crate::{resolve_bam, resolve_fasta};
 use itertools::iproduct;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Configuration file for the user definig which GIAB data and which in silico data
 #[derive(Deserialize, Debug)]
@@ -55,18 +54,6 @@ impl Config {
         }
         Ok(())
     }
-}
-
-#[derive(Deserialize, Debug)]
-struct SilicoConfig {
-    capture: String,
-    bam: Option<String>,
-    /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
-    clinvar: Option<PathBuf>,
-    /// Number of clinvar variants to sample to insert in the BAM
-    nb_variants: Option<u32>,
-    /// Output directory for intermediate files; defaults to "data/exp_raw".
-    outdir: Option<PathBuf>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -163,71 +150,6 @@ fn download_giab_runs(runs: &HashSet<Run>) {
     }
 }
 
-/// Generate controls from clinvar data and either a BAM file (real patient) or 100% in silico
-/// Returns a list of samplesheet rows for writing
-fn generate_controls(
-    silico: &SilicoConfig,
-    bed: PathBuf,
-    capture: &str,
-    fasta: PathBuf,
-) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
-    check_deps(&["bwa", "samtools", "muteditor"]);
-
-    let outdir = silico
-        .outdir
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("data/exp_raw"));
-
-    let mut rows: Vec<SamplesheetRow> = Vec::new();
-    if let Some(bam) = &silico.bam {
-        let (fq1, fq2) = generate_controls_bam(
-            bam,
-            bed,
-            capture,
-            fasta,
-            silico.clinvar.clone(),
-            silico.nb_variants,
-            outdir,
-        )?;
-        rows.push(silico_row("varben", fq1, fq2));
-    } else {
-        return Err("FASTQ generation not implemented".into());
-    }
-    Ok(rows)
-}
-
-/// Generate controls from a BAM file and returns 2 fastq
-fn generate_controls_bam(
-    bam: &str,
-    bed: PathBuf,
-    capture: &str,
-    fasta: PathBuf,
-    clinvar: Option<PathBuf>,
-    nb_variants: Option<u32>,
-    outdir: PathBuf,
-) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    std::fs::create_dir_all(&outdir)?;
-
-    let bam_path = resolve_bam(bam, &outdir)?;
-    let bam_stem = bam_path.file_stem().unwrap().to_string_lossy();
-    let bam_parent = bam_path.parent().unwrap_or(Path::new("."));
-    let fq1 = bam_parent.join(format!("{bam_stem}_1.fq.gz"));
-    let fq2 = bam_parent.join(format!("{bam_stem}_2.fq.gz"));
-
-    if fq1.exists() && fq2.exists() {
-        log::info!(
-            "Skipping BAM editing as output fastq already exists {:?}, {:?}",
-            fq1,
-            fq2
-        );
-        Ok((fq1, fq2))
-    } else {
-        log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(&bam_path, &bed, capture, fasta, clinvar, nb_variants)?;
-        bam_to_fastq(new_bam, fq1, fq2)
-    }
-}
-
 /// Main entry point for the `setup` subcommand.
 ///
 /// Depending on what is present in `conf`, downloads GIAB data and/or generates
@@ -261,7 +183,7 @@ pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
 }
 
 /// Build a samplesheet row for an in silico sample.
-fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetRow {
+pub fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetRow {
     let fq1_str = fq1
         .clone()
         .into_os_string()
@@ -307,7 +229,9 @@ mod tests {
     fn make_silico(capture: &str) -> SilicoConfig {
         SilicoConfig {
             capture: capture.to_string(),
-            bam: None,
+            fastq: false,
+            bam: false,
+            bam_file: String::new(),
             clinvar: None,
             nb_variants: None,
             outdir: None,
