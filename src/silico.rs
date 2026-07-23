@@ -1,10 +1,10 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
+use crate::download_blocking;
 use crate::setup::{SamplesheetRow, silico_row};
 use crate::simuscop;
 use crate::varben;
 use crate::{check_deps, resolve_bam};
-use crate::{download_blocking, ref_dir};
 use log;
 use noodles::bed;
 use noodles::bgzf;
@@ -21,8 +21,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use std::thread;
 
 /// [silico.simuscop] — presence enables simuscop FASTQ generation
@@ -89,7 +88,7 @@ pub fn generate_controls(
     let bam_path = resolve_bam(&silico.bam_file, &outdir)?;
 
     if let Some(varben) = &silico.varben {
-        let (fq1, fq2) = generate_controls_bam(
+        let (fq1, fq2) = varben::generate_controls_bam(
             &bam_path,
             &bed,
             &capture,
@@ -102,7 +101,7 @@ pub fn generate_controls(
         rows.push(silico_row("varben", fq1, fq2));
     }
     if let Some(simuscop) = &silico.simuscop {
-        let (fq1, fq2) = generate_controls_fastq(
+        let (fq1, fq2) = simuscop::generate_controls_fastq(
             &bam_path,
             &bed,
             &capture,
@@ -118,148 +117,7 @@ pub fn generate_controls(
     Ok(rows)
 }
 
-/// Generate controls into a in-silico FASTQ.
-/// Either `profile` (pre-built directory) or `vcf` (runs seqToProfile) must be provided.
-fn generate_controls_fastq(
-    bam: &PathBuf,
-    bed: &PathBuf,
-    capture: &str,
-    fasta: &PathBuf,
-    vcf: Option<&PathBuf>,
-    profile: Option<&PathBuf>,
-    variants: &Vec<RecordBuf>,
-    outdir: &PathBuf,
-    coverage: u32,
-) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let profile_dir = if let Some(p) = profile {
-        p.clone()
-    } else if let Some(v) = vcf {
-        ensure_profile(bam, v, fasta, bed, outdir)?
-    } else {
-        log::error!("[silico.simuscop] requires either `profile` or `vcf`");
-        return Err("[silico.simuscop] requires either `profile` or `vcf`".into());
-    };
-
-    let variation = outdir.join(format!("clinvar_{capture}.simuscop"));
-    simuscop::write_input(variants, &variation, capture)?;
-
-    let simuscop_outdir = outdir.join(format!("simuscop_{capture}"));
-    std::fs::create_dir_all(&simuscop_outdir)?;
-
-    let config_path = outdir.join(format!("simuscop_{capture}.conf"));
-    simuscop::write_config(
-        &config_path,
-        fasta,
-        &profile_dir,
-        &variation,
-        bed,
-        capture,
-        &simuscop_outdir,
-        coverage,
-    )?;
-
-    run_simu_reads(&config_path, capture, &simuscop_outdir)
-}
-
-/// Run simuReads with the given config. Returns (fq1, fq2) output paths.
-fn run_simu_reads(
-    config_path: &Path,
-    name: &str,
-    output_dir: &Path,
-) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let status = Command::new("simuReads")
-        .arg(
-            config_path
-                .to_str()
-                .ok_or("Invalid simuReads config path")?,
-        )
-        .status()?;
-
-    if !status.success() {
-        return Err(format!("simuReads exited with status {status}").into());
-    }
-
-    let fq1 = output_dir.join(format!("{name}_1.fq.gz"));
-    let fq2 = output_dir.join(format!("{name}_2.fq.gz"));
-    Ok((fq1, fq2))
-}
-
-/// Build a seqToProfile sequencing profile from a normal BAM.
-/// The profile directory is derived from the BAM stem and reused on subsequent runs.
-fn ensure_profile(
-    bam: &PathBuf,
-    vcf: &PathBuf,
-    fasta: &PathBuf,
-    bed: &PathBuf,
-    outdir: &PathBuf,
-) -> Result<PathBuf, Box<dyn Error>> {
-    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
-    let profile_dir = outdir.join(format!("{bam_stem}.profile"));
-
-    if profile_dir.exists() {
-        log::debug!("Reusing existing profile: {:?}", profile_dir);
-        return Ok(profile_dir);
-    }
-
-    std::fs::create_dir_all(&profile_dir)?;
-    log::info!("Generating sequencing profile with seqToProfile");
-
-    let status = Command::new("seqToProfile")
-        .args([
-            "-b",
-            bam.to_str().ok_or("Invalid BAM path")?,
-            "-v",
-            vcf.to_str().ok_or("Invalid VCF path")?,
-            "-r",
-            fasta.to_str().ok_or("Invalid FASTA path")?,
-            "-t",
-            bed.to_str().ok_or("Invalid BED path")?,
-            "-o",
-            profile_dir.to_str().ok_or("Invalid profile dir path")?,
-        ])
-        .status()?;
-
-    if !status.success() {
-        // Remove the empty directory so the next run retries cleanly
-        let _ = std::fs::remove_dir(&profile_dir);
-        return Err(format!("seqToProfile exited with status {status}").into());
-    }
-
-    Ok(profile_dir)
-}
-
 /// Generate controls from a BAM file and returns 2 fastq
-fn generate_controls_bam(
-    bam: &PathBuf,
-    bed: &PathBuf,
-    capture: &str,
-    fasta: &PathBuf,
-    variants: &Vec<RecordBuf>,
-    header: vcf::Header,
-    mindepth: Option<u32>,
-    outdir: &PathBuf,
-) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    std::fs::create_dir_all(&outdir)?;
-
-    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
-    let bam_parent = bam.parent().unwrap_or(Path::new("."));
-    let fq1 = bam_parent.join(format!("{bam_stem}_1.fq.gz"));
-    let fq2 = bam_parent.join(format!("{bam_stem}_2.fq.gz"));
-
-    if fq1.exists() && fq2.exists() {
-        log::info!(
-            "Skipping BAM editing as output fastq already exists {:?}, {:?}",
-            fq1,
-            fq2
-        );
-        Ok((fq1, fq2))
-    } else {
-        log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(&bam, &bed, capture, fasta, variants, header, mindepth)?;
-        bam_to_fastq(new_bam, fq1, fq2)
-    }
-}
-
 fn download_clinvar() -> PathBuf {
     log::debug!("Downloading clinvar vcf...");
     let mut url: String =
@@ -531,141 +389,6 @@ fn keep_variant(
         last_pos.insert(chrom.to_string(), pos);
     }
     ok
-}
-
-/// Helper function to index a BAM file
-pub fn index_bam(bam: &PathBuf) -> Result<(), Box<dyn Error>> {
-    let bai = bam.with_extension("bam.bai");
-    // Index the BAM
-    if !bai.exists() {
-        log::debug!("Indexing bam");
-        let status = Command::new("samtools")
-            .args(["index", &bam.to_string_lossy()])
-            .status()
-            .expect("Failed to run samtools index");
-        if !status.success() {
-            return Err(format!("samtools index exited with status {status}").into());
-        }
-    } else {
-        log::debug!("{:?} already exists ", bai);
-    }
-    Ok(())
-}
-
-/// Bam to fastq conversion require hard clips removal
-pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
-    let stem = bam.file_stem().unwrap().to_string_lossy();
-    let parent = bam.parent().unwrap_or(Path::new("."));
-    let filtered = parent.join(format!("{stem}_nohardclip.bam"));
-
-    if !filtered.exists() {
-        log::info!("Removing hard clips");
-        let cmd = format!(
-            "samtools view -h {} | awk '$6 !~ /H/{{print}}' | samtools view -bS - > {}",
-            bam.display(),
-            filtered.display()
-        );
-        let status = Command::new("sh")
-            .args(["-c", &cmd])
-            .status()
-            .expect("Failed to run hard clip filter");
-
-        if !status.success() {
-            return Err(format!("samtools exited with status {status}").into());
-        }
-    } else {
-        log::info!("Hardlink removal already done");
-    }
-    index_bam(&filtered)?;
-    Ok(filtered)
-}
-
-/// Download and extract the pre-built BWA index from NCBI if absent.
-pub fn ensure_bwa_index(fasta: &PathBuf) -> Result<(), Box<dyn Error>> {
-    let bwt = PathBuf::from(format!("{}.bwt", fasta.display()));
-    if bwt.exists() {
-        log::debug!("BWA index already exists");
-        return Ok(());
-    }
-    let tar_name = "GCA_000001405.15_GRCh38_full_analysis_set.fna.bwa_index.tar.gz";
-    let root_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.26_GRCh38/GRCh38_major_release_seqs_for_alignment_pipelines";
-    let url = format!("{root_url}/{tar_name}");
-    let tar_path = ref_dir().join(tar_name);
-    log::debug!("Downloading BWA index...");
-    download_blocking(&url, &tar_path);
-    log::debug!("Extracting BWA index...");
-    let status = Command::new("tar")
-        .args([
-            "-xzf",
-            tar_path.to_str().ok_or("Invalid tar path")?,
-            "-C",
-            ref_dir().to_str().ok_or("Invalid ref dir")?,
-        ])
-        .status()?;
-    if !status.success() {
-        // Archive is likely corrupt (e.g. interrupted download); remove it so the next run re-downloads.
-        let _ = std::fs::remove_file(&tar_path);
-        return Err(format!(
-            "Failed to extract BWA index archive (tar exited with {status}). \
-             The archive may have been corrupt or incompletely downloaded — \
-             it has been deleted. Re-run setup to download it again."
-        )
-        .into());
-    }
-    Ok(())
-}
-/// Generate controls from clinvar variant into a BAM file
-/// 1. Sample clinvar randomly
-/// 2. Generate mutation files from those clinvar variant for varben
-/// 3. Apply varben on a single bam file
-///
-/// If `clinvar_vcf` is None the file is downloaded from NCBI and stored in `outdir`.
-pub fn edit_bam(
-    bam: &PathBuf,
-    bed: &PathBuf,
-    capture: &str,
-    fasta: &PathBuf,
-    variants: &Vec<RecordBuf>,
-    header: vcf::Header,
-    mindepth: Option<u32>,
-) -> Result<PathBuf, Box<dyn Error>> {
-    let outdir = PathBuf::from("data/exp_raw");
-    std::fs::create_dir_all(&outdir)?;
-    index_bam(bam)?;
-
-    let bam_cleaned = remove_hard_clips(bam)?;
-    let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
-    varben::write_input(&variants, &mut_out)?;
-    ensure_bwa_index(&fasta)?;
-    let edited_bam =
-        varben::insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta, mindepth)?;
-
-    varben::write_as_vcf(bam, header, outdir, &fasta)?;
-
-    Ok(edited_bam)
-}
-
-/// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
-/// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
-pub fn bam_to_fastq(
-    bam: PathBuf,
-    fq1: PathBuf,
-    fq2: PathBuf,
-) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let cmd = format!(
-        "samtools sort -n {bam} -@ {threads} | samtools fastq -1 {fq1} -2 {fq2} -0 /dev/null -s /dev/null -n -@ {threads} -",
-        bam = bam.display(),
-        fq1 = fq1.display(),
-        fq2 = fq2.display(),
-        threads = nb_threads(),
-    );
-
-    let status = Command::new("sh").args(["-c", &cmd]).status()?;
-
-    if !status.success() {
-        return Err(format!("bam to fastq conversion exited with {status}").into());
-    }
-    Ok((fq1, fq2))
 }
 
 pub fn nb_threads() -> usize {
