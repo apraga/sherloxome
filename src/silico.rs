@@ -1,36 +1,28 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
 use crate::setup::{SamplesheetRow, silico_row};
+use crate::simuscop;
+use crate::varben;
 use crate::{check_deps, resolve_bam};
 use crate::{download_blocking, ref_dir};
 use log;
 use noodles::bed;
 use noodles::bgzf;
-use noodles::fasta;
 use noodles::vcf;
-use noodles::vcf::header::record::value::{Map, map::Format};
 use noodles::vcf::variant::RecordBuf;
 use noodles::vcf::variant::io::Write as VCFWrite;
 use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::info::field::Value;
-use noodles::vcf::variant::record::samples::keys::key as sample_key;
 use noodles::vcf::variant::record_buf::AlternateBases as AltBasesBuf;
-use noodles::vcf::variant::record_buf::samples::{
-    Keys as SampleKeys, Samples as SamplesBuf, sample::Value as SampleValue,
-};
 use rand::RngExt;
 use rand::prelude::IteratorRandom;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
-use std::io::BufRead;
 use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::ExitStatus;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::thread;
 
 /// [silico.simuscop] — presence enables simuscop FASTQ generation
@@ -98,15 +90,28 @@ pub fn generate_controls(
 
     if let Some(varben) = &silico.varben {
         let (fq1, fq2) = generate_controls_bam(
-            &bam_path, &bed, &capture, &fasta, &variants, header, varben.mindepth, &outdir,
+            &bam_path,
+            &bed,
+            &capture,
+            &fasta,
+            &variants,
+            header,
+            varben.mindepth,
+            &outdir,
         )?;
         rows.push(silico_row("varben", fq1, fq2));
     }
     if let Some(simuscop) = &silico.simuscop {
         let (fq1, fq2) = generate_controls_fastq(
-            &bam_path, &bed, &capture, &fasta,
-            simuscop.vcf.as_ref(), simuscop.profile.as_ref(),
-            &variants, &outdir, simuscop.coverage,
+            &bam_path,
+            &bed,
+            &capture,
+            &fasta,
+            simuscop.vcf.as_ref(),
+            simuscop.profile.as_ref(),
+            &variants,
+            &outdir,
+            simuscop.coverage,
         )?;
         rows.push(silico_row("simuscop", fq1, fq2));
     }
@@ -136,41 +141,24 @@ fn generate_controls_fastq(
     };
 
     let variation = outdir.join(format!("clinvar_{capture}.simuscop"));
-    write_simuscop_input(variants, &variation, capture)?;
+    simuscop::write_input(variants, &variation, capture)?;
 
     let simuscop_outdir = outdir.join(format!("simuscop_{capture}"));
     std::fs::create_dir_all(&simuscop_outdir)?;
 
     let config_path = outdir.join(format!("simuscop_{capture}.conf"));
-    write_simuscop_config(&config_path, fasta, &profile_dir, &variation, bed, capture, &simuscop_outdir, coverage)?;
+    simuscop::write_config(
+        &config_path,
+        fasta,
+        &profile_dir,
+        &variation,
+        bed,
+        capture,
+        &simuscop_outdir,
+        coverage,
+    )?;
 
     run_simu_reads(&config_path, capture, &simuscop_outdir)
-}
-
-/// Write a simuReads config file
-pub fn write_simuscop_config(
-    config_path: &Path,
-    fasta: &Path,
-    profile_dir: &Path,
-    variation: &Path,
-    bed: &Path,
-    name: &str,
-    output_dir: &Path,
-    coverage: u32,
-) -> Result<(), Box<dyn Error>> {
-    let threads = nb_threads();
-    let mut w = BufWriter::new(File::create(config_path)?);
-    writeln!(w, "ref = {}", fasta.display())?;
-    writeln!(w, "profile = {}", profile_dir.display())?;
-    writeln!(w, "variation = {}", variation.display())?;
-    writeln!(w, "target = {}", bed.display())?;
-    writeln!(w, "name = {}", name)?;
-    writeln!(w, "output = {}", output_dir.display())?;
-    writeln!(w, "layout = PE")?;
-    writeln!(w, "threads = {}", threads)?;
-    writeln!(w, "coverage = {}", coverage)?;
-    w.flush()?;
-    Ok(())
 }
 
 /// Run simuReads with the given config. Returns (fq1, fq2) output paths.
@@ -180,7 +168,11 @@ fn run_simu_reads(
     output_dir: &Path,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     let status = Command::new("simuReads")
-        .arg(config_path.to_str().ok_or("Invalid simuReads config path")?)
+        .arg(
+            config_path
+                .to_str()
+                .ok_or("Invalid simuReads config path")?,
+        )
         .status()?;
 
     if !status.success() {
@@ -363,60 +355,6 @@ fn is_snv(record: &vcf::Record) -> bool {
             .filter_map(|a| a.ok())
             .all(|a| a.len() == 1)
 }
-
-/// Write VCF record to varben format. Assume chromosoes do NOT have a chr prefix
-/// Output generate heterozygous variant (AF betwen 0.4 and 0.6)
-fn write_varben(w: &mut impl Write, record: &RecordBuf) -> Result<(), Box<dyn Error>> {
-    let mut rng = rand::rng();
-    let af: f64 = rng.random_range(0.4..0.6);
-    let chrom_raw = record.reference_sequence_name();
-    let chrom_nb = chrom_raw.strip_prefix("chr").unwrap_or(chrom_raw);
-    let chrom_chr = format!("chr{}", chrom_nb);
-    let pos = record.variant_start().unwrap();
-    let alt = record.alternate_bases();
-    let alt_merged = alt.iter().filter_map(|a| a.ok()).next().unwrap_or(".");
-    writeln!(
-        w,
-        "{}\t{}\t{}\t{}\tsnv\t{}",
-        chrom_chr, pos, pos, af, alt_merged
-    )?;
-    Ok(())
-}
-
-/// Write one SNV in simuscop tab-separated variation format (no header line).
-/// Always emits `het` since we sample heterozygous AF from clinvar.
-fn write_simuscop_variant(
-    w: &mut impl Write,
-    record: &RecordBuf,
-    sample: &str,
-) -> Result<(), Box<dyn Error>> {
-    let chrom = record.reference_sequence_name();
-    let pos = usize::from(record.variant_start().unwrap());
-    let ref_base = record.reference_bases().to_lowercase();
-    let alt = record
-        .alternate_bases()
-        .iter()
-        .filter_map(|a| a.ok())
-        .next()
-        .unwrap_or(".");
-    writeln!(w, "s\t{sample}\t{chrom}\t{pos}\t{ref_base}\t{alt}\thet")?;
-    Ok(())
-}
-
-/// Write simuscop input file from a list of variant
-fn write_simuscop_input(
-    variants: &[RecordBuf],
-    out: &Path,
-    sample: &str,
-) -> Result<(), Box<dyn Error>> {
-    let mut w = BufWriter::new(File::create(out)?);
-    for v in variants {
-        write_simuscop_variant(&mut w, v, sample)?;
-    }
-    w.flush()?;
-    Ok(())
-}
-
 /// Sort chromsome by natural ornder
 fn chrom_order(chrom: &str) -> (u8, u32) {
     match chrom.trim_start_matches("chr") {
@@ -454,7 +392,7 @@ fn sample_clinvar_variants(
     selected
 }
 
-fn sort_by_chromosome(variants: &mut Vec<RecordBuf>) {
+pub fn sort_by_chromosome(variants: &mut Vec<RecordBuf>) {
     variants.sort_by(|a, b| {
         chrom_order(a.reference_sequence_name())
             .cmp(&chrom_order(b.reference_sequence_name()))
@@ -537,34 +475,6 @@ fn write_sampled_clinvar_vcf(
     for record in variants {
         writer.write_variant_record(header, record)?;
     }
-    Ok(())
-}
-
-/// Write varben output as VCF successful insertions only, failures are not properly formatted,
-pub fn write_varben_as_vcf(
-    bam: &PathBuf,
-    header: vcf::Header,
-    outdir: PathBuf,
-    fasta: &PathBuf,
-) -> Result<(), Box<dyn Error>> {
-    let varben_dir = outdir.join("varben");
-    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
-
-    let success_list = varben_dir.join("success_list.txt");
-    let success_vcf = outdir.join(format!("{bam_stem}_varben.vcf.gz"));
-    write_varben_as_vcf_single(success_list, success_vcf, header, fasta)
-}
-
-/// Write a mutation file for varben using sampled clinvar data
-fn write_varben_input(variants: &Vec<RecordBuf>, mut_out: &PathBuf) -> Result<(), Box<dyn Error>> {
-    // Prepare mutation file
-    let mut varben_w = BufWriter::new(File::create(&mut_out)?);
-    writeln!(varben_w, "#chrom\tstart\tend\tAF\ttype\talt")?;
-
-    for v in variants {
-        write_varben(&mut varben_w, v)?;
-    }
-    varben_w.flush()?;
     Ok(())
 }
 
@@ -725,75 +635,16 @@ pub fn edit_bam(
 
     let bam_cleaned = remove_hard_clips(bam)?;
     let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
-    write_varben_input(&variants, &mut_out)?;
+    varben::write_input(&variants, &mut_out)?;
     ensure_bwa_index(&fasta)?;
-    let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta, mindepth)?;
+    let edited_bam =
+        varben::insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta, mindepth)?;
 
-    write_varben_as_vcf(bam, header, outdir, &fasta)?;
+    varben::write_as_vcf(bam, header, outdir, &fasta)?;
 
     Ok(edited_bam)
 }
 
-/// Use varben (muteditor) to insert a list of variant in a bed files. Require varben, samtools, bwa
-/// Require a reference genome and a bwa index
-/// Output folder is the varben subfolder of `outdir`
-fn insert_variants(
-    mut_file: PathBuf,
-    bam: PathBuf,
-    outdir: PathBuf,
-    fasta: &PathBuf,
-    mindepth: Option<u32>,
-) -> Result<PathBuf, Box<dyn Error>> {
-    let outdir_ = outdir.join("varben");
-    std::fs::create_dir_all(&outdir_)?;
-
-    let fasta_str = fasta.to_str().ok_or("Invalid fasta path")?;
-    let mut_str = mut_file.to_str().ok_or("Invalid mutation file path")?;
-    let bam_str = bam.to_str().ok_or("Invalid BAM path")?;
-    let outdir_str = outdir_.to_str().ok_or("Invalid output folder")?;
-
-    let output = outdir_.join("edit.sorted.bam");
-    // If there's file from older run, override them
-    let stale = output.exists()
-        && mut_file.metadata().ok().and_then(|m| m.modified().ok())
-            > output.metadata().ok().and_then(|m| m.modified().ok());
-    if output.exists() && !stale {
-        log::debug!("{:?} already exists", output);
-    } else {
-        let log_path = outdir_.join("varben.log");
-        let status = insert_variants_varben(mut_str, bam_str, fasta_str, outdir_str, mindepth, log_path)?;
-        if !status.success() {
-            return Err(format!("muteditor exited with status {status}").into());
-        }
-    }
-    Ok(output)
-}
-
-fn insert_variants_varben(
-    mut_str: &str,
-    bam_str: &str,
-    fasta_str: &str,
-    outdir_str: &str,
-    mindepth: Option<u32>,
-    log_path: PathBuf,
-) -> Result<ExitStatus, std::io::Error> {
-    let log_file = File::create(&log_path)?;
-
-    let mut cmd = Command::new("muteditor");
-    cmd.args([
-        "-m", mut_str,
-        "-p", "1",
-        "-b", bam_str,
-        "-r", fasta_str,
-        "--aligner", "bwa",
-        "--alignerIndex", fasta_str,
-        "-o", outdir_str,
-    ]);
-    if let Some(depth) = mindepth {
-        cmd.args(["--mindepth", &depth.to_string()]);
-    }
-    cmd.stdout(Stdio::from(log_file)).status()
-}
 /// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
 /// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
 pub fn bam_to_fastq(
@@ -817,76 +668,10 @@ pub fn bam_to_fastq(
     Ok((fq1, fq2))
 }
 
-fn nb_threads() -> usize {
+pub fn nb_threads() -> usize {
     thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(1)
-}
-
-/// Convert varben tabular data to a simple VCF.
-/// Require a fasta as varben only store alternative allel and not refercen
-fn write_varben_as_vcf_single(
-    mut_file: PathBuf,
-    vcf_out: PathBuf,
-    mut header: vcf::Header,
-    fasta: &PathBuf,
-) -> Result<(), Box<dyn Error>> {
-    header.sample_names_mut().insert(String::from("TRUTH"));
-    header.formats_mut().insert(
-        String::from(sample_key::GENOTYPE),
-        Map::<Format>::from(sample_key::GENOTYPE),
-    );
-
-    let gt_keys: SampleKeys = [String::from(sample_key::GENOTYPE)].into_iter().collect();
-
-    let mut fasta_reader = fasta::io::indexed_reader::Builder::default().build_from_path(fasta)?;
-
-    let reader = BufReader::new(File::open(mut_file)?);
-    let mut records: Vec<RecordBuf> = Vec::new();
-
-    for line in reader.lines() {
-        let line = line?;
-        if line.starts_with('#') {
-            continue;
-        }
-        let fields: Vec<&str> = line.splitn(6, '\t').collect();
-        if fields.len() < 6 {
-            continue;
-        }
-        let chrom = fields[0];
-        let pos: usize = fields[1].parse()?;
-        let alt = fields[5].trim();
-
-        let region: noodles::core::Region = format!("{}:{}-{}", chrom, pos, pos).parse()?;
-        let record = fasta_reader.query(&region)?;
-        let seq = record.sequence().as_ref();
-        let ref_base = std::str::from_utf8(&seq[..1])?.to_uppercase();
-
-        let samples = SamplesBuf::new(gt_keys.clone(), vec![vec![Some(SampleValue::from("0/1"))]]);
-        let buf = RecordBuf::builder()
-            .set_reference_sequence_name(chrom)
-            .set_variant_start(noodles::core::Position::try_from(pos)?)
-            .set_reference_bases(ref_base)
-            .set_alternate_bases(AltBasesBuf::from(vec![alt.to_string()]))
-            .set_samples(samples)
-            .build();
-
-        records.push(buf);
-    }
-
-    sort_by_chromosome(&mut records);
-
-    // let header = vcf::Header::default();
-    let mut writer = File::create(vcf_out.clone())
-        .map(bgzf::io::Writer::new)
-        .map(vcf::io::Writer::new)?;
-    writer.write_header(&header)?;
-    for rec in &records {
-        writer.write_variant_record(&header, rec)?;
-    }
-
-    log::debug!("Wrote {} variants to {:?}", records.len(), vcf_out);
-    Ok(())
 }
 
 #[cfg(test)]
@@ -900,7 +685,7 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let config_path = dir.join("test.conf");
 
-        write_simuscop_config(
+        simuscop::write_config(
             &config_path,
             Path::new("/ref/genome.fa"),
             Path::new("/data/sample.profile"),
@@ -914,11 +699,23 @@ mod tests {
 
         let content = fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("ref = /ref/genome.fa"), "missing ref");
-        assert!(content.contains("profile = /data/sample.profile"), "missing profile");
-        assert!(content.contains("variation = /data/clinvar.simuscop"), "missing variation");
-        assert!(content.contains("target = /data/capture.bed"), "missing target");
+        assert!(
+            content.contains("profile = /data/sample.profile"),
+            "missing profile"
+        );
+        assert!(
+            content.contains("variation = /data/clinvar.simuscop"),
+            "missing variation"
+        );
+        assert!(
+            content.contains("target = /data/capture.bed"),
+            "missing target"
+        );
         assert!(content.contains("name = agilent-col6a1"), "missing name");
-        assert!(content.contains("output = /data/simuscop_out"), "missing output");
+        assert!(
+            content.contains("output = /data/simuscop_out"),
+            "missing output"
+        );
         assert!(content.contains("layout = PE"), "missing layout");
         assert!(content.contains("coverage = 50"), "missing coverage");
         assert!(content.contains("threads = "), "missing threads");
@@ -930,7 +727,7 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let config_path = dir.join("test.conf");
 
-        write_simuscop_config(
+        simuscop::write_config(
             &config_path,
             Path::new("/ref/genome.fa"),
             Path::new("/profile"),

@@ -15,6 +15,8 @@ pub mod giab;
 pub mod plot;
 pub mod setup;
 pub mod silico;
+pub mod simuscop;
+pub mod varben;
 use log;
 use std::path::PathBuf;
 use which::which;
