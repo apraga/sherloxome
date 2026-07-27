@@ -1,3 +1,4 @@
+use crate::resolve_bam;
 use crate::silico::nb_threads;
 use noodles::vcf::variant::RecordBuf;
 use noodles::vcf::variant::record::AlternateBases;
@@ -67,7 +68,7 @@ pub fn write_config(
 /// Generate controls into a in-silico FASTQ.
 /// Either `profile` (pre-built directory) or `vcf` (runs seqToProfile) must be provided.
 pub fn generate_controls_fastq(
-    bam: &PathBuf,
+    bam: &Option<String>,
     bed: &PathBuf,
     capture: &str,
     fasta: &PathBuf,
@@ -80,7 +81,13 @@ pub fn generate_controls_fastq(
     let profile_dir = if let Some(p) = profile {
         p.clone()
     } else if let Some(v) = vcf {
-        ensure_profile(bam, v, fasta, bed, outdir)?
+        if let Some(bam_file) = bam {
+            let bam_path = resolve_bam(bam_file, outdir)?;
+            generate_profile(&bam_path, v, fasta, bed, outdir)?
+        } else {
+            log::error!("[silico.simuscop] requires a BAM file if no profile is set");
+            return Err("[silico.simuscop] requires a BAM file if no profile is set".into());
+        }
     } else {
         log::error!("[silico.simuscop] requires either `profile` or `vcf`");
         return Err("[silico.simuscop] requires either `profile` or `vcf`".into());
@@ -132,28 +139,27 @@ fn run_simu_reads(
 
 /// Build a seqToProfile sequencing profile from a normal BAM.
 /// The profile directory is derived from the BAM stem and reused on subsequent runs.
-fn ensure_profile(
-    bam: &PathBuf,
+fn generate_profile(
+    bam_path: &PathBuf,
     vcf: &PathBuf,
     fasta: &PathBuf,
     bed: &PathBuf,
     outdir: &PathBuf,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
+    let bam_stem = bam_path.file_stem().unwrap().to_string_lossy();
     let profile_dir = outdir.join(format!("{bam_stem}.profile"));
 
     if profile_dir.exists() {
         log::debug!("Reusing existing profile: {:?}", profile_dir);
         return Ok(profile_dir);
     }
-
     std::fs::create_dir_all(&profile_dir)?;
     log::info!("Generating sequencing profile with seqToProfile");
 
     let status = Command::new("seqToProfile")
         .args([
             "-b",
-            bam.to_str().ok_or("Invalid BAM path")?,
+            bam_path.to_str().ok_or("Invalid BAM path")?,
             "-v",
             vcf.to_str().ok_or("Invalid VCF path")?,
             "-r",

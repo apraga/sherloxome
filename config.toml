@@ -19,7 +19,8 @@ nb_variants = 2
 # fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
 # Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent-col6a1"
-# A BAM file is always required. Varben will modify it, simuscop will define a sequencing profile from it.
+# A BAM file is always required for varben as it will will modify it
+# Simuscop will define a sequencing profile from it if it does not exist.
 # Can be a URL or a local path.
 bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip.bam"
 

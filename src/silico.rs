@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::thread;
 
 /// [silico.simuscop] — presence enables simuscop FASTQ generation
@@ -46,8 +46,8 @@ pub struct SilicoVarbenConfig {
 #[derive(Deserialize, Debug)]
 pub struct SilicoConfig {
     pub capture: String,
-    /// A BAM file is always required. Varben will modify it, simuscop will define a sequencing profile from it.
-    pub bam_file: String,
+    /// A BAM file is required for varben but not nor simuscop
+    pub bam_file: Option<String>,
     /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
     pub clinvar: Option<PathBuf>,
     /// Number of clinvar variants to sample to insert in the BAM
@@ -85,36 +85,74 @@ pub fn generate_controls(
         silico.nb_variants,
         vcf_out,
     )?;
-    let bam_path = resolve_bam(&silico.bam_file, &outdir)?;
-
     if let Some(varben) = &silico.varben {
-        let (fq1, fq2) = varben::generate_controls_bam(
-            &bam_path,
-            &bed,
-            &capture,
-            &fasta,
-            &variants,
-            header,
-            varben.mindepth,
-            &outdir,
-        )?;
-        rows.push(silico_row("varben", fq1, fq2));
+        generate_controls_varben(
+            &silico, &bed, capture, &fasta, &variants, &header, &outdir, varben, &mut rows,
+        );
     }
     if let Some(simuscop) = &silico.simuscop {
-        let (fq1, fq2) = simuscop::generate_controls_fastq(
-            &bam_path,
-            &bed,
-            &capture,
-            &fasta,
-            simuscop.vcf.as_ref(),
-            simuscop.profile.as_ref(),
-            &variants,
-            &outdir,
-            simuscop.coverage,
-        )?;
-        rows.push(silico_row("simuscop", fq1, fq2));
+        generate_controls_simuscop(
+            &silico, &bed, capture, &fasta, &variants, &header, &outdir, simuscop, &mut rows,
+        );
     }
     Ok(rows)
+}
+
+fn generate_controls_varben(
+    silico: &SilicoConfig,
+    bed: &PathBuf,
+    capture: &str,
+    fasta: &PathBuf,
+    variants: &Vec<RecordBuf>,
+    header: &vcf::Header,
+    outdir: &PathBuf,
+    varben: &SilicoVarbenConfig,
+    rows: &mut Vec<SamplesheetRow>,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(bam_file) = &silico.bam_file {
+        let bam_path = resolve_bam(bam_file, &outdir)?;
+        let (fq1, fq2) = varben::generate_controls_bam(
+            &bam_path,
+            bed,
+            capture,
+            fasta,
+            variants,
+            header,
+            varben.mindepth,
+            outdir,
+        )?;
+        rows.push(silico_row("varben", fq1, fq2));
+        Ok(())
+    } else {
+        log::error!("[silico.varben] requires a BAM file");
+        return Err("[silico.varben] requires a BAM file".into());
+    }
+}
+
+fn generate_controls_simuscop(
+    silico: &SilicoConfig,
+    bed: &PathBuf,
+    capture: &str,
+    fasta: &PathBuf,
+    variants: &Vec<RecordBuf>,
+    header: &vcf::Header,
+    outdir: &PathBuf,
+    simuscop: &SilicoSimuscopConfig,
+    rows: &mut Vec<SamplesheetRow>,
+) -> Result<(), Box<dyn Error>> {
+    let (fq1, fq2) = simuscop::generate_controls_fastq(
+        &silico.bam_file,
+        &bed,
+        &capture,
+        &fasta,
+        simuscop.vcf.as_ref(),
+        simuscop.profile.as_ref(),
+        &variants,
+        &outdir,
+        simuscop.coverage,
+    )?;
+    rows.push(silico_row("simuscop", fq1, fq2));
+    Ok(())
 }
 
 /// Generate controls from a BAM file and returns 2 fastq

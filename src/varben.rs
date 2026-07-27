@@ -33,7 +33,7 @@ pub fn generate_controls_bam(
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
-    header: vcf::Header,
+    header: &vcf::Header,
     mindepth: Option<u32>,
     outdir: &PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
@@ -70,7 +70,7 @@ pub fn edit_bam(
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
-    header: vcf::Header,
+    header: &vcf::Header,
     mindepth: Option<u32>,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
@@ -104,7 +104,7 @@ pub fn write_input(variants: &Vec<RecordBuf>, mut_out: &PathBuf) -> Result<(), B
 /// Write varben output as VCF successful insertions only, failures are not properly formatted,
 pub fn write_as_vcf(
     bam: &PathBuf,
-    header: vcf::Header,
+    header: &vcf::Header,
     outdir: PathBuf,
     fasta: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
@@ -113,7 +113,8 @@ pub fn write_as_vcf(
 
     let success_list = varben_dir.join("success_list.txt");
     let success_vcf = outdir.join(format!("{bam_stem}_varben.vcf.gz"));
-    write_as_vcf_single(success_list, success_vcf, header, fasta)
+    let mut header_ = header.clone();
+    write_as_vcf_single(success_list, success_vcf, &mut header_, fasta)
 }
 
 /// Convert varben tabular data to a simple VCF.
@@ -121,7 +122,7 @@ pub fn write_as_vcf(
 fn write_as_vcf_single(
     mut_file: PathBuf,
     vcf_out: PathBuf,
-    mut header: vcf::Header,
+    header: &mut vcf::Header,
     fasta: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     header.sample_names_mut().insert(String::from("TRUTH"));
