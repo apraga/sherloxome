@@ -88,12 +88,12 @@ pub fn generate_controls(
     if let Some(varben) = &silico.varben {
         generate_controls_varben(
             &silico, &bed, capture, &fasta, &variants, &header, &outdir, varben, &mut rows,
-        );
+        )?;
     }
     if let Some(simuscop) = &silico.simuscop {
         generate_controls_simuscop(
             &silico, &bed, capture, &fasta, &variants, &header, &outdir, simuscop, &mut rows,
-        );
+        )?;
     }
     Ok(rows)
 }

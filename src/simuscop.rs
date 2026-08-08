@@ -147,35 +147,35 @@ fn generate_profile(
     outdir: &PathBuf,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let bam_stem = bam_path.file_stem().unwrap().to_string_lossy();
-    let profile_dir = outdir.join(format!("{bam_stem}.profile"));
+    let profile_file = outdir.join(format!("{bam_stem}.profile"));
 
-    if profile_dir.exists() {
-        log::debug!("Reusing existing profile: {:?}", profile_dir);
-        return Ok(profile_dir);
+    if profile_file.exists() {
+        log::debug!("Reusing existing profile: {:?}", profile_file);
+        return Ok(profile_file);
     }
-    std::fs::create_dir_all(&profile_dir)?;
+    std::fs::create_dir_all(outdir)?;
     log::info!("Generating sequencing profile with seqToProfile");
+    let args = [
+        "-b",
+        bam_path.to_str().ok_or("Invalid BAM path")?,
+        "-v",
+        vcf.to_str().ok_or("Invalid VCF path")?,
+        "-r",
+        fasta.to_str().ok_or("Invalid FASTA path")?,
+        "-t",
+        bed.to_str().ok_or("Invalid BED path")?,
+        "-o",
+        profile_file.to_str().ok_or("Invalid profile dir path")?,
+    ];
+    println!("{:?}", args);
 
-    let status = Command::new("seqToProfile")
-        .args([
-            "-b",
-            bam_path.to_str().ok_or("Invalid BAM path")?,
-            "-v",
-            vcf.to_str().ok_or("Invalid VCF path")?,
-            "-r",
-            fasta.to_str().ok_or("Invalid FASTA path")?,
-            "-t",
-            bed.to_str().ok_or("Invalid BED path")?,
-            "-o",
-            profile_dir.to_str().ok_or("Invalid profile dir path")?,
-        ])
-        .status()?;
+    let status = Command::new("seqToProfile").args(args).status()?;
 
     if !status.success() {
         // Remove the empty directory so the next run retries cleanly
-        let _ = std::fs::remove_dir(&profile_dir);
+        let _ = std::fs::remove_dir(&profile_file);
         return Err(format!("seqToProfile exited with status {status}").into());
     }
 
-    Ok(profile_dir)
+    Ok(profile_file)
 }
