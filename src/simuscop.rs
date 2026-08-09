@@ -1,4 +1,5 @@
 use crate::resolve_bam;
+use crate::run::{run_from_filename, run_to_string};
 use crate::silico::nb_threads;
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -96,19 +97,25 @@ pub fn generate_controls_fastq(
         return Err("[silico.simuscop] requires either `profile` or `vcf`".into());
     };
 
-    let variation = outdir.join(format!("clinvar_{capture}.simuscop"));
-    write_input(variants, &variation, capture)?;
-
-    // Name the run after the sequencing profile (e.g. "hiseq4000-agilent-50x" ->
-    // "hiseq4000_agilent_50x_simuscop"), not the capture, so multiple profiles/depths
-    // sharing a capture don't clobber each other's output or config.
+    // Add a false patient id before extracting
     let profile_stem = profile_dir
         .file_stem()
         .ok_or("Invalid profile path")?
         .to_string_lossy();
-    let base = format!("{profile_stem}_simuscop");
+    let profile2 = PathBuf::from(format!("nopatient_{}", profile_stem));
+    let run = run_from_filename(&profile2).ok_or_else(|| {
+        format!(
+            "profile file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx{{_SILICO}} filenaming scheme",
+            profile2
+        )
+    })?;
+    let run_str = run_to_string(&run);
+
+    let base = format!("{run_str}_simuscop");
 
     std::fs::create_dir_all(outdir)?;
+    let variation = outdir.join(format!("{run_str}.simuscop"));
+    write_input(variants, &variation, &base)?;
 
     let config_path = outdir.join(format!("{base}.conf"));
     write_config(

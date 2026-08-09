@@ -19,24 +19,27 @@ nb_variants = 2
 # fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
 # Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent-col6a1"
+# capture = "agilent"
 # A BAM file is always required for varben as it will will modify it
 # Simuscop will define a sequencing profile from it if it does not exist.
 # Can be a URL or a local path.
 bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip.bam"
+# bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
 
 # This section enables simuscop FASTQ generation (remove section to disable)
 [silico.simuscop]
 # Pre-built seqToProfile profile directory. If set, seqToProfile is skipped.
-# profile = "data/ref/my_sample.profile"
+# The profile must follow the filenaming scheme
+profile = "data/ref/hiseq4000_agilent_50x.profile"
 # VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
 # Required when profile is absent; seqToProfile is run to build the profile.
-vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
+# vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
 # Sequencing coverage
 coverage = 50
 
 # This section enables varben BAM editing (remove section to disable)
-# [silico.varben]
-# mindepth = 30
+[silico.varben]
+mindepth = 30
 
 # Define here the name of alls captures and the bed file
 [capture]

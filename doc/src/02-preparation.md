@@ -10,9 +10,9 @@ This command writes `samplesheet.csv` for the variant calling pipeline. Here's a
 
 ```csv
 patient,sample,lane,fastq_1,fastq_2
-HG002,HG002_hiseq4000_agilent_50x,1,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50/HG002.hiseq4000.wes_agilent.50.R1.fastq.gz,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50/HG002.hiseq4000.wes_agilent.50.R2.fastq.gz
-silico-varben,HG002_hiseq4000_agilent-col6a1_50x_nohardclip_varben,1,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip_1.fq.gz,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip_2.fq.gz
-silico-simuscop,agilent-col6a1_simuscop,1,data/exp_raw/simuscop_agilent-col6a1/agilent-col6a1_1.fq.gz,data/exp_raw/simuscop_agilent-col6a1/agilent-col6a1_2.fq.gz
+HG002,HG002_hiseq4000_agilent_50x,1,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes_agilent.50x.R1.fastq.gz,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes_agilent.50x.R2.fastq.gz
+silico-varben,HG002_hiseq4000_agilent-col6a1_50x_varben_varben,1,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben_1.fq.gz,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben_2.fq.gz
+silico-simuscop,nopatient_hiseq4000_agilent_50x_simuscop_simuscop,1,data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop_1.fq.gz,data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop_2.fq.gz
 ```
 
 See also the [filenaming scheme](050-filenaming.md).

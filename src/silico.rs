@@ -92,7 +92,7 @@ pub fn generate_controls(
     }
     if let Some(simuscop) = &silico.simuscop {
         generate_controls_simuscop(
-            &silico, &bed, capture, &fasta, &variants, &header, &outdir, simuscop, &mut rows,
+            &silico, &bed, capture, &fasta, &variants, &outdir, simuscop, &mut rows,
         )?;
     }
     Ok(rows)
@@ -135,7 +135,6 @@ fn generate_controls_simuscop(
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
-    header: &vcf::Header,
     outdir: &PathBuf,
     simuscop: &SilicoSimuscopConfig,
     rows: &mut Vec<SamplesheetRow>,

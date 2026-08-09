@@ -27,8 +27,8 @@ fn run_re() -> &'static Regex {
     })
 }
 
-/// Infer a [`Run`] from a VCF filename following the
-/// `SAMPLE-CAPTURE-DEPTH-SEQUENCER{-SILICO}.*.vcf` convention.
+/// Infer a [`Run`] from a filename following the
+/// `SAMPLE_CAPTURE_DEPTH_SEQUENCER{_SILICO}.*.EXTENTION` convention.
 pub fn run_from_filename(fname: &PathBuf) -> Option<Run> {
     let name = fname.file_name()?.to_string_lossy();
     let caps = run_re().captures(name.as_ref())?;
