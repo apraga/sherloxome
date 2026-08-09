@@ -2,6 +2,7 @@
 //!
 //! Generate control variants by sampling clinvar and insert them into a real BAM
 
+use crate::run::{run_from_filename, run_to_string};
 use crate::silico::{nb_threads, sort_by_chromosome};
 use crate::{download_blocking, ref_dir};
 use noodles::bgzf;
@@ -39,10 +40,20 @@ pub fn generate_controls_bam(
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     std::fs::create_dir_all(&outdir)?;
 
-    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
     let bam_parent = bam.parent().unwrap_or(Path::new("."));
-    let fq1 = bam_parent.join(format!("{bam_stem}_1.fq.gz"));
-    let fq2 = bam_parent.join(format!("{bam_stem}_2.fq.gz"));
+    // Reuse the SAMPLE_SEQUENCER_CAPTURE_DEPTH parsed from the input BAM name, but
+    // stamp the silico tag as "varben" so the output follows the filenaming scheme
+    // regardless of what the input BAM was itself called (e.g. "..._nohardclip").
+    let mut run = run_from_filename(bam).ok_or_else(|| {
+        format!(
+            "BAM file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx{{_SILICO}} filenaming scheme",
+            bam
+        )
+    })?;
+    run.silico = Some("varben".to_string());
+    let base = run_to_string(&run);
+    let fq1 = bam_parent.join(format!("{base}_1.fq.gz"));
+    let fq2 = bam_parent.join(format!("{base}_2.fq.gz"));
 
     if fq1.exists() && fq2.exists() {
         log::info!(

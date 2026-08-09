@@ -99,22 +99,30 @@ pub fn generate_controls_fastq(
     let variation = outdir.join(format!("clinvar_{capture}.simuscop"));
     write_input(variants, &variation, capture)?;
 
-    let simuscop_outdir = outdir.join(format!("simuscop_{capture}"));
-    std::fs::create_dir_all(&simuscop_outdir)?;
+    // Name the run after the sequencing profile (e.g. "hiseq4000-agilent-50x" ->
+    // "hiseq4000_agilent_50x_simuscop"), not the capture, so multiple profiles/depths
+    // sharing a capture don't clobber each other's output or config.
+    let profile_stem = profile_dir
+        .file_stem()
+        .ok_or("Invalid profile path")?
+        .to_string_lossy();
+    let base = format!("{profile_stem}_simuscop");
 
-    let config_path = outdir.join(format!("simuscop_{capture}.conf"));
+    std::fs::create_dir_all(outdir)?;
+
+    let config_path = outdir.join(format!("{base}.conf"));
     write_config(
         &config_path,
         fasta,
         &profile_dir,
         &variation,
         bed,
-        capture,
-        &simuscop_outdir,
+        &base,
+        outdir,
         coverage,
     )?;
 
-    run_simu_reads(&config_path, capture, &simuscop_outdir)
+    run_simu_reads(&config_path, &base, outdir)
 }
 
 /// Run simuReads with the given config. Returns (fq1, fq2) output paths.
