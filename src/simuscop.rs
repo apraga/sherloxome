@@ -1,9 +1,12 @@
 use crate::resolve_bam;
 use crate::silico::nb_threads;
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use noodles::vcf::variant::RecordBuf;
 use noodles::vcf::variant::record::AlternateBases;
 use std::error::Error;
 use std::fs::File;
+use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -132,9 +135,23 @@ fn run_simu_reads(
         return Err(format!("simuReads exited with status {status}").into());
     }
 
-    let fq1 = output_dir.join(format!("{name}_1.fq.gz"));
-    let fq2 = output_dir.join(format!("{name}_2.fq.gz"));
+    let fq1 = compress_fastq(&output_dir.join(format!("{name}_1.fq")))?;
+    let fq2 = compress_fastq(&output_dir.join(format!("{name}_2.fq")))?;
     Ok((fq1, fq2))
+}
+
+/// Gzip-compress a plain fastq file produced by simuReads, removing the uncompressed
+/// original. Returns the path to the resulting `.fq.gz` file.
+fn compress_fastq(fq: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    let gz_path = PathBuf::from(format!("{}.gz", fq.display()));
+
+    let mut reader = BufReader::new(File::open(fq)?);
+    let mut encoder = GzEncoder::new(File::create(&gz_path)?, Compression::default());
+    std::io::copy(&mut reader, &mut encoder)?;
+    encoder.finish()?;
+
+    std::fs::remove_file(fq)?;
+    Ok(gz_path)
 }
 
 /// Build a seqToProfile sequencing profile from a normal BAM.
