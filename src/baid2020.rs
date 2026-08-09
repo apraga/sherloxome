@@ -469,12 +469,13 @@ pub fn real_row(run: &Run) -> SamplesheetRow {
 
 /// Use google cloud URL. Nextflow will download the data
 pub fn url(run: &Run, lane: &str) -> String {
+    let depth = format!("{}x", run.depth);
     let root = format!(
         "https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/{sequencer}/wes_{capture}/{depth}/{sample}.{sequencer}.wes_{capture}.{depth}",
         capture = run.capture,
         sequencer = run.sequencer,
         sample = run.sample,
-        depth = run.depth,
+        depth = depth,
     );
 
     format!("{}.{}.fastq.gz", root, lane)
