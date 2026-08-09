@@ -64,24 +64,10 @@ FASTQ files are **not** downloaded. For real patients, `samplesheet.csv` contain
 
 ## Synthetic in silico controls
 
-Add a `[silico]` section to inject ClinVar pathogenic variants into a real BAM:
-
-```toml
-[silico]
-capture     = "agilent"
-bam         = "https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam"
-clinvar     = "data/exp_raw/clinvar.vcf.gz"   # optional; downloaded from NCBI if absent
-nb_variants = 1000
-```
-
-### Steps performed
-
-1. The BAM is downloaded (if `bam` is an URL) or verified locally
-2. Hard-clipped reads are removed with `samtools` + `awk`
-3. `nb_variants` ClinVar pathogenic SNVs are sampled from within the capture BED, enforcing ≥50 bp spacing between selected variants
-4. `muteditor` inserts the variants into the BAM with random allele fractions (0.4–0.6)
-5. The edited BAM is converted to paired FASTQ via `samtools fastq`
-6. A VCF of successfully inserted variants is written alongside the FASTQ
+Silico data consits of a FAST generated either
+- from a patient BAM with injected Clinvar pathogenic variants with `varben`
+- purely in silico for a sequencer and capture kit based on a model with `simuscop`
+Both can be combined. See [Limitations](07-limitations.md)
 
 ### Variant selection criteria
 
@@ -91,6 +77,77 @@ A ClinVar variant is eligible if it:
 - Has `CLNSIG` of `Pathogenic`, `Likely_pathogenic`, or `Uncertain_significance`
 - Is an SNV (single-nucleotide variant, REF and ALT both length 1)
 - Is ≥50 bp from the nearest already-selected variant on the same chromosome
+
+
+### Common configuration
+
+A `[silico]` section contains setup for both `simuscop` and `varben` for clinvar variants insertion :
+
+```toml
+[silico]
+# VCF containing clinvar variants. If not set, the VCF will be downloaded from NCBI
+clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
+# Number of random clinvar variants to insert into the BAM file. Default is 1000
+nb_variants = 2
+# URL to fasta, or link to local version, otherwise download it from NCBI
+# fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
+```
+
+and a BAM file for varben is also needd in the common section as it can be used by simuscop or vaben, but for different purposes.
+
+```toml
+# Capture kit name (the BED must be defined in [capture] below)
+capture = "agilent"
+# A BAM file is always required for varben as it will will modify it
+# Simuscop will define a sequencing profile from it if it does not exist.
+# Can be a URL or a local path.
+bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
+```
+
+
+### Simuscop specific configuration
+
+```toml
+# This section enables simuscop FASTQ generation (remove section to disable)
+[silico.simuscop]
+# Pre-built seqToProfile profile directory. If set, seqToProfile is skipped.
+profile = "data/ref/
+# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
+# Required when profile is absent; seqToProfile is run to build the profile.
+#vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
+# Sequencing coverage
+coverage = 50
+```
+
+Simuscop will generate a FASTQ according to a profile. `sherloxome` ships several pre-built profiles.
+
+data/exp_raw/hiseq4000-agilent-50x
+
+To create your own profile, a BAM, VCF are required
+
+```toml
+[silico.simuscop]
+# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
+# Required when profile is absent; seqToProfile is run to build the profile.
+vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
+```
+
+### Varben specific configuration
+
+```toml
+# This section enables varben BAM editing (remove section to disable)
+[silico.varben]
+mindepth = 30
+```
+
+#### Varben algorithm
+
+1. The BAM is downloaded (if `bam` is an URL) or verified locally
+2. Hard-clipped reads are removed with `samtools` + `awk`
+3. `nb_variants` ClinVar pathogenic SNVs are sampled from within the capture BED, enforcing ≥50 bp spacing between selected variants
+4. `muteditor` inserts the variants into the BAM with random allele fractions (0.4–0.6)
+5. The edited BAM is converted to paired FASTQ via `samtools fastq`
+6. A VCF of successfully inserted variants is written alongside the FASTQ
 
 ### Output files
 
