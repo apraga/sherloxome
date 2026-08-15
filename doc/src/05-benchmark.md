@@ -21,7 +21,12 @@ sherloxome analyze \
 
 For each VCF whose filename contains recognisable run metadata (patient, sequencer, capture, depth):
 
-1. Locates the GIAB truth VCF and high-confidence BED in `data/ref/`
+1. Locates the truth VCF and BED file
+- for GIAB data, it's in  in `data/ref/`. Patient, sequencer, depth and capture kit must match. See [the filenaming scheme](050-filenaming.md).
+- for silico data, the reference VCF must be in `data/exp_raw`. Here are 2 example in our CI
+    - For varben, output vcf is `HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`, reference VCF is `data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`
+    - For simuscop, output vcf is `nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`, reference VCF is `data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`
+
 2. Locates the capture kit BED from `[capture]` in `config.toml`
 3. Generates an RTG SDF from the reference FASTA on first run (`rtg format`)
 4. Runs `hap.py` with the `vcfeval` engine (single-threaded per run; VCFs are processed in parallel)

@@ -1,6 +1,10 @@
 doc/book
-*.vcf.gz
-*.tbi
+clinvar.vcf.*
+clinvar_agilent-col6a1.vcf.*
+clinvar_agilent.vcf.*
+HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.*
+# *.vcf.gz
+# *.tbi
 *.fq.gz
 silico
 target/
@@ -32,3 +36,5 @@ output_tiddit
 *.fna.pac
 *.fna.sa
 *.fna.bwt
+*.simuscop
+*_simuscop.conf

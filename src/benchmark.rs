@@ -144,8 +144,11 @@ fn real_run_to_happy(
     })
 }
 
-/// TODO support fastq generation with simuscop
-/// For silico run, the reference vcf is the varben-named VCF in data/exp_raw
+/// Support fastq generation with simuscop
+/// For silico run, the reference vcf has the same name as the output VCF in data/exp_raw
+/// For varben, output vcf is `HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`, reference VCF is `data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`
+/// For simuscop, output vcf is `nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`, reference VCF is `data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`
+/// in data/exp_raw with
 /// There is no truth_bed, we simply use the capture
 fn silico_run_to_happy(
     run: Run,

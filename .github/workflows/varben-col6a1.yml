@@ -86,7 +86,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import csv, sys
-          path = "tests/test-varben/HG002_hiseq4000_agilent-col6a1_50x.summary.csv"
+          path = "tests/test-varben/HG002_hiseq4000_agilent-col6a1_50x_varben.summary.csv"
           with open(path) as f:
               for row in csv.DictReader(f):
                   if row["Type"] == "SNP" and row["Filter"] == "PASS":

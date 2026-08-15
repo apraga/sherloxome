@@ -1,6 +1,12 @@
  # URL to fasta, or link to local version, otherwise download it from NCBI
  # We need a full fasta for silico data to avoid remapping error
 fasta = "data/ref/GCA_000001405.15_GRCh38_full_analysis_set.fna"
+# Reference used only to build the rtg SDF for vcfeval during benchmarking.
+# `rtg format` copies the whole sequence to disk, unlike hap.py's --reference
+# (which just needs a matching .fai), so this is chr21-only to avoid running
+# out of disk formatting the full genome in CI. COL6A1 is entirely on chr21,
+# so evaluation is unaffected.
+rtg_fasta = "data/ref/chr21.fna"
 
 # Configuration for raw GIAB patients data
 [real]
