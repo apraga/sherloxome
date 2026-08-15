@@ -70,7 +70,7 @@ jobs:
         run: |
           nix develop ./reproducible-sarek-germline --command \
             nextflow run nf-core/sarek -r 3.5.1 \
-              --input tests/samplesheet-hg002-col6a1.csv \
+              --input samplesheet.csv \
               -c conf/test_chr21.conf \
               --outdir tests/test-varben
 
