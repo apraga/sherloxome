@@ -27,6 +27,12 @@ use std::path::PathBuf;
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub fasta: String,
+    /// Reference used only for `rtg format` when benchmarking (vcfeval's SDF template).
+    /// Defaults to `fasta`. Useful to point at a smaller reference (e.g. a single
+    /// chromosome) to avoid formatting the full genome, since `rtg format` copies
+    /// the whole sequence to disk, unlike hap.py's `--reference` which just needs
+    /// a `.fai` alongside the matching contigs.
+    pub rtg_fasta: Option<String>,
     real: Option<RealConfig>,
     silico: Option<SilicoConfig>,
     pub capture: HashMap<String, String>,
@@ -228,7 +234,7 @@ mod tests {
     fn make_silico(capture: &str) -> SilicoConfig {
         SilicoConfig {
             capture: capture.to_string(),
-            bam_file: String::new(),
+            bam_file: None,
             clinvar: None,
             nb_variants: None,
             outdir: None,
@@ -244,6 +250,7 @@ mod tests {
     ) -> Config {
         Config {
             fasta: String::new(),
+            rtg_fasta: None,
             real,
             silico,
             capture: captures

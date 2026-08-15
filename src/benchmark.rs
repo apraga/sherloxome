@@ -36,7 +36,11 @@ pub fn analyze(
     check_deps(&["rtg"]);
     create_dir_all(&output_dir)?;
     let fasta = resolve_fasta(&conf.fasta)?;
-    let sdf = fasta_to_sdf(&fasta)?;
+    let rtg_fasta = match &conf.rtg_fasta {
+        Some(path) => resolve_fasta(path)?,
+        None => fasta.clone(),
+    };
+    let sdf = fasta_to_sdf(&rtg_fasta)?;
     let runs = runs_to_analyze(&input_dir)?;
     let queue: Vec<HappyRunSetup> = runs
         .into_iter()
