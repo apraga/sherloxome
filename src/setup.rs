@@ -193,14 +193,13 @@ pub fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetR
         .into_os_string()
         .into_string()
         .expect("Unable to confvert fastq 2 to string");
-    let sample_base = fq1
+    let sample = fq1
         .file_stem()
         .unwrap()
         .to_os_string()
         .into_string()
         .unwrap()
         .replace("_1.fq", "");
-    let sample = format!("{}_{}", sample_base, silico_type);
 
     return SamplesheetRow {
         patient: format!("silico-{}", silico_type),
