@@ -1,0 +1,18 @@
+fasta = "data/ref/chr21.fna"
+
+[silico]
+capture = "agilent-col6a1"
+clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
+nb_variants = 2
+
+[silico.simuscop]
+# Pre-built profile: skips seqToProfile (and the BAM/VCF it would need)
+profile = "data/ref/hiseq4000_agilent_50x.profile"
+coverage = 50
+
+[capture]
+# Key required by `setup` (looked up via [silico].capture)
+agilent-col6a1 = "data/capture/agilent-col6a1.targets.grch38.bed"
+# Key required by `benchmark` (looked up via the capture token embedded in the
+# profile filename, e.g. "hiseq4000_agilent_50x.profile" -> "agilent")
+agilent = "data/capture/agilent-col6a1.targets.grch38.bed"

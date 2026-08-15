@@ -1,0 +1,89 @@
+name: Simuscop testing on COL6A1
+
+on:
+  push:
+    branches:
+    - main
+    - ci
+
+  workflow_dispatch:
+
+jobs:
+  test-simuscop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Checkout reproducible-sarek-germline
+        uses: actions/checkout@v5
+        with:
+          repository: apraga/reproducible-sarek-germline
+          path: reproducible-sarek-germline
+          ref: main
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: cachix/cachix-action@v14
+        with:
+          name: sherloxome
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build benchmark tool
+        run: cargo build --release
+
+      # Use our other cache to avoid rebuilding everything
+      - uses: cachix/cachix-action@v14
+        with:
+          name: reproducible-sarek-germline
+
+      # Simuscop uses the pre-built profile committed in data/ref/, so no BWA index
+      # or seqToProfile run is needed here (unlike the varben job).
+      - name: Run setup
+        run: |
+          nix shell .#default --command \
+            ./target/release/sherloxome setup --config tests/config-simuscop-ci.toml
+
+      - name: Prepare simuscop truth VCF
+        run: |
+          cp data/exp_raw/clinvar_agilent-col6a1.vcf.gz data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop.vcf.gz
+          nix shell .#default --command \
+            bcftools index -t data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop.vcf.gz
+
+      - name: Run sarek pipeline
+        run: |
+          nix develop ./reproducible-sarek-germline --command \
+            nextflow run nf-core/sarek -r 3.5.1 \
+              --input samplesheet.csv \
+              -c conf/test_chr21.conf \
+              --outdir tests/test-simuscop
+
+      - name: Run benchmark
+        run: |
+          nix shell .#default --command \
+            ./target/release/sherloxome benchmark \
+              --config tests/config-simuscop-ci.toml \
+              --input tests/test-simuscop/ \
+              --output tests/test-simuscop/
+
+      - name: Check recall == 1
+        run: |
+          python3 - <<'EOF'
+          import csv, sys
+          path = "tests/test-simuscop/nopatient_hiseq4000_agilent_50x_simuscop.summary.csv"
+          with open(path) as f:
+              for row in csv.DictReader(f):
+                  if row["Type"] == "SNP" and row["Filter"] == "PASS":
+                      recall = float(row["METRIC.Recall"])
+                      tp, total = int(row["TRUTH.TP"]), int(row["TRUTH.TOTAL"])
+                      if total == 0 or recall < 1.0:
+                          print(f"FAIL: expected recall=1.0, got recall={recall}, {tp}/{total}", file=sys.stderr)
+                          sys.exit(1)
+                      print(f"OK: recall={recall}, {tp}/{total} SNPs found")
+                      sys.exit(0)
+          print("FAIL: SNP PASS row not found", file=sys.stderr)
+          sys.exit(1)
+          EOF
