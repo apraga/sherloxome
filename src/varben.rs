@@ -352,13 +352,27 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     Ok(filtered)
 }
 
+const FASTA_NCBI: &str = "GCA_000001405.15_GRCh38_full_analysis_set.fna";
+
 /// Download and extract the pre-built BWA index from NCBI if absent.
 pub fn ensure_bwa_index(fasta: &PathBuf) -> Result<(), Box<dyn Error>> {
     let bwt = PathBuf::from(format!("{}.bwt", fasta.display()));
     if bwt.exists() {
         log::debug!("BWA index already exists");
         return Ok(());
+    } else if fasta.file_name().and_then(|n| n.to_str()) == Some(FASTA_NCBI) {
+        download_bwa_index()
+    } else {
+        Err(format!(
+            "No BWA index for {fasta:?} (expected {bwt:?}). Build it first, e.g. `bwa index {}`.",
+            fasta.display()
+        )
+        .into())
     }
+}
+
+/// Download NCBI bwa index for GRCH38
+fn download_bwa_index() -> Result<(), Box<dyn Error>> {
     let tar_name = "GCA_000001405.15_GRCh38_full_analysis_set.fna.bwa_index.tar.gz";
     let root_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.26_GRCh38/GRCh38_major_release_seqs_for_alignment_pipelines";
     let url = format!("{root_url}/{tar_name}");
