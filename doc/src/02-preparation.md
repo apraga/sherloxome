@@ -167,6 +167,8 @@ In the example above, the relevant part of the samplesheet is
 silico-simuscop,agilent-col6a1_simuscop,1,data/exp_raw/simuscop_agilent-col6a1/agilent-col6a1_1.fq.gz,data/exp_raw/simuscop_agilent-col6a1/agilent-col6a1_2.fq.gz
 ```
 
+Simuscop also requires a file with SNP. We download dbSNP and keep relevant variants [as documented here](021-dbsnp.md).
+
 ### Varben specific configuration
 
 ```toml
