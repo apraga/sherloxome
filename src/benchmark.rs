@@ -107,7 +107,9 @@ fn run_to_happy(
     captures: &HashMap<String, String>,
 ) -> Option<HappyRunSetup> {
     match run.silico {
-        Some(_) => silico_run_to_happy(run, query_vcf, captures).ok(),
+        Some(_) => silico_run_to_happy(run, query_vcf, captures)
+            .map_err(|e| log::warn!("{e}"))
+            .ok(),
         None => real_run_to_happy(run, query_vcf, captures)
             .map_err(|e| log::warn!("{e}"))
             .ok(),
@@ -148,7 +150,6 @@ fn real_run_to_happy(
 /// For silico run, the reference vcf has the same name as the output VCF in data/exp_raw
 /// For varben, output vcf is `HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`, reference VCF is `data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`
 /// For simuscop, output vcf is `nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`, reference VCF is `data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`
-/// in data/exp_raw with
 /// There is no truth_bed, we simply use the capture
 fn silico_run_to_happy(
     run: Run,
@@ -157,6 +158,9 @@ fn silico_run_to_happy(
 ) -> Result<HappyRunSetup, Box<dyn Error>> {
     let prefix = run_to_string(&run);
     let truth_vcf = PathBuf::from("data/exp_raw").join(format!("{}.vcf.gz", prefix));
+    if !truth_vcf.exists() {
+        return Err(format!("reference VCF {} not found", truth_vcf.display()).into());
+    }
     let query_bed = captures
         .get(&run.capture)
         .map(PathBuf::from)
