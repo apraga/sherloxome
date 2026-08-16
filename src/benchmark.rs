@@ -42,14 +42,16 @@ pub fn analyze(
     };
     let sdf = fasta_to_sdf(&rtg_fasta)?;
     let runs = runs_to_analyze(&input_dir)?;
+    let candidates = runs.len();
     let queue: Vec<HappyRunSetup> = runs
         .into_iter()
         .filter_map(|(run, vcf)| run_to_happy(run, vcf, &conf.capture))
         .collect();
+    let matched = queue.len();
 
     download_missing(&queue);
 
-    queue
+    let results: Vec<bool> = queue
         .into_par_iter()
         .filter_map(|item| {
             validate_files(&[
@@ -60,7 +62,7 @@ pub fn analyze(
             ])
             .map(|_| item)
         })
-        .for_each(|item| {
+        .map(|item| {
             happy_vcfeval(
                 &item.truth_vcf,
                 &item.truth_bed,
@@ -70,10 +72,13 @@ pub fn analyze(
                 &fasta,
                 &sdf,
                 &item.prefix,
-            );
-        });
+            )
+        })
+        .collect();
+    let validated = results.len();
+    let happy_failures = results.into_iter().filter(|success| !success).count();
 
-    merge_summaries(output_dir)?;
+    merge_summaries(output_dir, candidates, matched, validated, happy_failures)?;
     Ok(())
 }
 
@@ -195,7 +200,17 @@ fn silico_run_to_happy(
 // }
 
 /// Merge all hap.py summary CSVs in output_dir into a single merged.csv with run metadata columns.
-fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
+///
+/// `candidates`/`matched`/`validated`/`happy_failures` describe how many runs made it through
+/// each pipeline stage (filenaming match -> truth/capture resolution -> file validation ->
+/// hap.py execution), so a descriptive error can be raised if nothing came out the other end.
+fn merge_summaries(
+    output_dir: PathBuf,
+    candidates: usize,
+    matched: usize,
+    validated: usize,
+    happy_failures: usize,
+) -> Result<(), Box<dyn Error>> {
     let pattern = format!("{}/*.summary.csv", output_dir.display());
 
     let dfs: Vec<LazyFrame> = glob(&pattern)?
@@ -216,7 +231,15 @@ fn merge_summaries(output_dir: PathBuf) -> Result<(), Box<dyn Error>> {
         .collect::<Result<_, _>>()?;
 
     if dfs.is_empty() {
-        return Err("No summary CSVs found — all runs may have been skipped or failed".into());
+        return Err(format!(
+            "No summary CSVs found in {}: {candidates} run(s) matched the filenaming scheme, \
+             {matched} resolved a truth VCF/capture, {validated} passed file validation and ran \
+             hap.py ({happy_failures} of those failed). Runs are skipped silently at `warn`/`debug` \
+             log level — re-run with `RUST_LOG=warn` (or `debug` for more detail) to see why each \
+             run was skipped or failed.",
+            output_dir.display()
+        )
+        .into());
     }
 
     let mut merged = concat(dfs, UnionArgs::default())?.collect()?;
@@ -250,6 +273,7 @@ fn fasta_to_sdf(fasta: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     Ok(sdf)
 }
 
+/// Runs hap.py for one item. Returns `true` if a summary CSV already existed or was produced.
 fn happy_vcfeval(
     truth_vcf: &PathBuf,
     truth_bed: &PathBuf,
@@ -259,11 +283,11 @@ fn happy_vcfeval(
     fasta: &PathBuf,
     sdf: &PathBuf,
     prefix: &str,
-) {
+) -> bool {
     let out = output_dir.join(prefix);
     if out.with_extension("summary.csv").exists() {
         println!("Summary file already exists, skipping");
-        return;
+        return true;
     }
 
     // println!("Processing {:?}", query_vcf);
@@ -290,7 +314,9 @@ fn happy_vcfeval(
 
     if !status.success() {
         eprintln!("hap.py failed for {:?}", query_vcf);
+        return false;
     }
+    true
 }
 
 /// Download missing GIAB truth VCF (.vcf.gz + .tbi) and BED for every real run in the queue.
