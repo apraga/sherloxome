@@ -8,6 +8,9 @@ nb_variants = 2
 [silico.simuscop]
 # Pre-built profile: skips seqToProfile (and the BAM/VCF it would need)
 profile = "data/ref/hiseq4000_agilent-col6a1_50x.profile"
+# simuscop treats `coverage` as a peak/max rather than a realized mean, so this is scaled
+# internally (see MEAN_COVERAGE_REALIZATION in src/silico.rs) to target this as an actual
+# mean over the capture region.
 coverage = 50
 
 [capture]

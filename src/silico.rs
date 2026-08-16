@@ -32,7 +32,10 @@ pub struct SilicoSimuscopConfig {
     /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
     /// Required when `profile` is absent; seqToProfile is run to build the profile.
     pub vcf: Option<PathBuf>,
-    /// Sequencing coverage
+    /// Target mean sequencing coverage over the capture region. simuscop's own `coverage`
+    /// parameter behaves more like a peak/max than a realized mean (see
+    /// `MEAN_COVERAGE_REALIZATION`), so this value is scaled up before being written to the
+    /// simuReads config.
     pub coverage: u32,
 }
 
@@ -139,6 +142,15 @@ fn generate_controls_simuscop(
     simuscop: &SilicoSimuscopConfig,
     rows: &mut Vec<SamplesheetRow>,
 ) -> Result<(), Box<dyn Error>> {
+    // simuscop's `coverage` parameter behaves like a peak/max rather than a realized mean:
+    // This factor was measured empirically on the COL6A1 capture (35 exons,
+    // ~88bp average, vs a ~350bp mean fragment size) and is NOT a universal constant
+    const MEAN_COVERAGE_REALIZATION: f64 = 0.65;
+    let coverage = (simuscop.coverage as f64 / MEAN_COVERAGE_REALIZATION).round() as u32;
+    log::debug!(
+        "Scaling coverage {} -> {coverage} to convert to mean",
+        simuscop.coverage
+    );
     let (fq1, fq2) = simuscop::generate_controls_fastq(
         &silico.bam_file,
         &bed,
@@ -148,7 +160,7 @@ fn generate_controls_simuscop(
         simuscop.profile.as_ref(),
         &variants,
         &outdir,
-        simuscop.coverage,
+        coverage,
     )?;
     rows.push(silico_row("simuscop", fq1, fq2));
     Ok(())

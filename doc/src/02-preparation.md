@@ -123,9 +123,11 @@ profile = "data/exp_raw/hiseq400-agilent-50x.profile"
 # VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
 # Required when profile is absent; seqToProfile is run to build the profile.
 #vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
-# Sequencing coverage
+# Sequencing coverage 
 coverage = 50
 ```
+
+**Warning** : simuscop use a maximu coverage. The configuration above will be converted to an estimation for a mean coverage by dividing by 0.65 (empirical value).
 
 Simuscop will generate a FASTQ according to a profile. `sherloxome` ships several pre-built profiles.
 
