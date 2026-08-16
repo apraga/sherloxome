@@ -49,9 +49,9 @@ jobs:
 
       - name: Prepare simuscop truth VCF
         run: |
-          cp data/exp_raw/clinvar_agilent-col6a1.vcf.gz data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop.vcf.gz
+          cp data/exp_raw/clinvar_agilent-col6a1.vcf.gz data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz
           nix shell .#default --command \
-            bcftools index -t data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop.vcf.gz
+            bcftools index -t data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz
 
       - name: Run sarek pipeline
         run: |
@@ -73,7 +73,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import csv, sys
-          path = "tests/test-simuscop/nopatient_hiseq4000_agilent_50x_simuscop.summary.csv"
+          path = "tests/test-simuscop/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.summary.csv"
           with open(path) as f:
               for row in csv.DictReader(f):
                   if row["Type"] == "SNP" and row["Filter"] == "PASS":

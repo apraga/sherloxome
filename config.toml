@@ -36,7 +36,7 @@ bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip.bam"
 [silico.simuscop]
 # Pre-built seqToProfile profile directory. If set, seqToProfile is skipped.
 # The profile must follow the filenaming scheme
-profile = "data/ref/hiseq4000_agilent_50x.profile"
+profile = "data/ref/hiseq4000_agilent-col6a1_50x.profile"
 # VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
 # Required when profile is absent; seqToProfile is run to build the profile.
 # vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
