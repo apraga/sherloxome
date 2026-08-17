@@ -1,0 +1,76 @@
+2026-08-17 08:16:00 serial = 27182818284
+2026-08-17 08:16:00 email = anon
+2026-08-17 08:16:00 RTG version = RTG Tools 3.13 / Core unknown (1980-01-01)
+2026-08-17 08:16:00 file.encoding = UTF-8
+2026-08-17 08:16:00 file.separator = /
+2026-08-17 08:16:00 host.name = <Unknown Host>
+2026-08-17 08:16:00 java.class.path = /nix/store/7x5rnzbfy0j7dd19wm6ml2f6dm8g2p2f-rtg-tools-3.13/bin/RTG.jar
+2026-08-17 08:16:00 java.class.version = 65.0
+2026-08-17 08:16:00 java.home = /nix/store/cl36jmhc6yq7a0l3lpcxij8xah07wfl4-openjdk-21.0.10+7/lib/openjdk
+2026-08-17 08:16:00 java.io.tmpdir = /tmp
+2026-08-17 08:16:00 java.library.path = /nix/store/7x5rnzbfy0j7dd19wm6ml2f6dm8g2p2f-rtg-tools-3.13/bin
+2026-08-17 08:16:00 java.runtime.name = OpenJDK Runtime Environment
+2026-08-17 08:16:00 java.runtime.version = 21.0.10+7-nixos
+2026-08-17 08:16:00 java.specification.name = Java Platform API Specification
+2026-08-17 08:16:00 java.specification.vendor = Oracle Corporation
+2026-08-17 08:16:00 java.specification.version = 21
+2026-08-17 08:16:00 java.vendor = N/A
+2026-08-17 08:16:00 java.vendor.url = https://openjdk.org/
+2026-08-17 08:16:00 java.vendor.url.bug = https://bugreport.java.com/bugreport/
+2026-08-17 08:16:00 java.version = 21.0.10
+2026-08-17 08:16:00 java.version.date = 2026-01-20
+2026-08-17 08:16:00 java.vm.compressedOopsMode = Zero based
+2026-08-17 08:16:00 java.vm.info = mixed mode, sharing
+2026-08-17 08:16:00 java.vm.name = OpenJDK 64-Bit Server VM
+2026-08-17 08:16:00 java.vm.specification.name = Java Virtual Machine Specification
+2026-08-17 08:16:00 java.vm.specification.vendor = Oracle Corporation
+2026-08-17 08:16:00 java.vm.specification.version = 21
+2026-08-17 08:16:00 java.vm.vendor = Oracle Corporation
+2026-08-17 08:16:00 java.vm.version = 21.0.10+7-nixos
+2026-08-17 08:16:00 jdk.debug = release
+2026-08-17 08:16:00 lang.version = 21.0.10
+2026-08-17 08:16:00 line.separator = 
+
+2026-08-17 08:16:00 models.dir = /nix/store/7x5rnzbfy0j7dd19wm6ml2f6dm8g2p2f-rtg-tools-3.13/bin/models
+2026-08-17 08:16:00 nashorn.option.no.deprecation.warning = true
+2026-08-17 08:16:00 native.encoding = UTF-8
+2026-08-17 08:16:00 os.arch = amd64
+2026-08-17 08:16:00 os.freememory = 1948741632
+2026-08-17 08:16:00 os.name = Linux
+2026-08-17 08:16:00 os.totalmemory = 15961137152
+2026-08-17 08:16:00 os.version = 6.18.43-gentoo-dist-bin
+2026-08-17 08:16:00 path.separator = :
+2026-08-17 08:16:00 polyglot.js.nashorn-compat = true
+2026-08-17 08:16:00 processor.arch = amd64
+2026-08-17 08:16:00 processor.count = 16
+2026-08-17 08:16:00 references.dir = /nix/store/7x5rnzbfy0j7dd19wm6ml2f6dm8g2p2f-rtg-tools-3.13/bin/references
+2026-08-17 08:16:00 runtime.freememory = 245817440
+2026-08-17 08:16:00 runtime.maxmemory = 14369685504
+2026-08-17 08:16:00 runtime.totalMemory = 260046848
+2026-08-17 08:16:00 stderr.encoding = UTF-8
+2026-08-17 08:16:00 stdout.encoding = UTF-8
+2026-08-17 08:16:00 sun.arch.data.model = 64
+2026-08-17 08:16:00 sun.boot.library.path = /nix/store/cl36jmhc6yq7a0l3lpcxij8xah07wfl4-openjdk-21.0.10+7/lib/openjdk/lib
+2026-08-17 08:16:00 sun.cpu.endian = little
+2026-08-17 08:16:00 sun.io.unicode.encoding = UnicodeLittle
+2026-08-17 08:16:00 sun.java.command = /nix/store/7x5rnzbfy0j7dd19wm6ml2f6dm8g2p2f-rtg-tools-3.13/bin/RTG.jar format data/ref/chr21.fna -o data/ref/chr21.sdf
+2026-08-17 08:16:00 sun.java.launcher = SUN_STANDARD
+2026-08-17 08:16:00 sun.jnu.encoding = UTF-8
+2026-08-17 08:16:00 sun.management.compiler = HotSpot 64-Bit Tiered Compilers
+2026-08-17 08:16:00 talkback = true
+2026-08-17 08:16:00 user.country = US
+2026-08-17 08:16:00 user.dir = /home/alex/code/sherloxome
+2026-08-17 08:16:00 user.home = /home/alex
+2026-08-17 08:16:00 user.language = en
+2026-08-17 08:16:00 user.name = alex
+2026-08-17 08:16:00 user.timezone = Europe/Paris
+2026-08-17 08:16:00 vendor = N/A
+2026-08-17 08:16:00 gzipfix.enabled = false
+2026-08-17 08:16:00 Command line arguments: rtg format data/ref/chr21.fna -o data/ref/chr21.sdf
+2026-08-17 08:16:00 Run Id: 7abf67e2-a0a5-4dcf-b0e5-4ada82eec78d
+2026-08-17 08:16:00 Formatting FASTA data
+2026-08-17 08:16:00 Performing trimming with no trimming
+2026-08-17 08:16:00 Processing "data/ref/chr21.fna"
+2026-08-17 08:16:01 Writing SDF-Id: 601a3807-8cfb-4fa4-b349-29025bc2107e
+2026-08-17 08:16:01 Referenced SDF-ID: 601a3807-8cfb-4fa4-b349-29025bc2107e Type: DNA Sequences: 1 Max-Length: 46709983 Min-Length: 46709983 Arm: UNKNOWN
+2026-08-17 08:16:01 Finished successfully in 0 s.

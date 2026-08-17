@@ -95,7 +95,7 @@ pub fn generate_controls(
     }
     if let Some(simuscop) = &silico.simuscop {
         generate_controls_simuscop(
-            &silico, &bed, capture, &fasta, &variants, &outdir, simuscop, &mut rows,
+            &silico, &bed, &fasta, &variants, &header, &outdir, simuscop, &mut rows,
         )?;
     }
     Ok(rows)
@@ -135,7 +135,6 @@ fn generate_controls_varben(
 fn generate_controls_simuscop(
     silico: &SilicoConfig,
     bed: &PathBuf,
-    capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
     outdir: &PathBuf,
@@ -154,7 +153,7 @@ fn generate_controls_simuscop(
     let (fq1, fq2) = simuscop::generate_controls_fastq(
         &silico.bam_file,
         &bed,
-        &capture,
+        // &capture,
         &fasta,
         simuscop.vcf.as_ref(),
         simuscop.profile.as_ref(),

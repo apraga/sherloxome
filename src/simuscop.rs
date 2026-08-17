@@ -74,7 +74,7 @@ pub fn write_config(
 pub fn generate_controls_fastq(
     bam: &Option<String>,
     bed: &PathBuf,
-    capture: &str,
+    // capture: &str,
     fasta: &PathBuf,
     vcf: Option<&PathBuf>,
     profile: Option<&PathBuf>,
