@@ -1,10 +1,18 @@
 use crate::resolve_bam;
 use crate::run::{run_from_filename, run_to_string};
-use crate::silico::nb_threads;
+use crate::silico::{index_vcf, nb_threads, sort_by_chromosome};
 use flate2::Compression;
 use flate2::write::GzEncoder;
+use noodles::bgzf;
+use noodles::vcf;
+use noodles::vcf::header::record::value::{Map, map::Format};
 use noodles::vcf::variant::RecordBuf;
+use noodles::vcf::variant::io::Write as VariantWrite;
 use noodles::vcf::variant::record::AlternateBases;
+use noodles::vcf::variant::record::samples::keys::key as sample_key;
+use noodles::vcf::variant::record_buf::samples::{
+    Keys as SampleKeys, Samples as SamplesBuf, sample::Value as SampleValue,
+};
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -40,6 +48,53 @@ pub fn write_input(variants: &[RecordBuf], out: &Path, sample: &str) -> Result<(
         write_variant(&mut w, v, sample)?;
     }
     w.flush()?;
+    Ok(())
+}
+
+/// Write the variants used to drive simuReads as a bgzipped VCF, giving a ground-truth
+/// reference VCF for benchmarking with hap.py (see `benchmark::silico_run_to_happy`).
+/// simuReads inserts every requested variant (unlike varben, which can fail to insert some),
+/// so the input variant list doubles as the truth set. All variants are heterozygous,
+/// matching the "het" zygosity always emitted by `write_variant`.
+pub fn write_as_vcf(
+    variants: &[RecordBuf],
+    header: &vcf::Header,
+    vcf_out: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let mut header = header.clone();
+    header.sample_names_mut().insert(String::from("TRUTH"));
+    header.formats_mut().insert(
+        String::from(sample_key::GENOTYPE),
+        Map::<Format>::from(sample_key::GENOTYPE),
+    );
+
+    let gt_keys: SampleKeys = [String::from(sample_key::GENOTYPE)].into_iter().collect();
+
+    let mut records: Vec<RecordBuf> = variants
+        .iter()
+        .map(|v| {
+            let mut rec = v.clone();
+            let samples =
+                SamplesBuf::new(gt_keys.clone(), vec![vec![Some(SampleValue::from("0/1"))]]);
+            *rec.samples_mut() = samples;
+            rec
+        })
+        .collect();
+    sort_by_chromosome(&mut records);
+
+    let mut writer = File::create(vcf_out)
+        .map(bgzf::io::Writer::new)
+        .map(vcf::io::Writer::new)?;
+    writer.write_header(&header)?;
+    for rec in &records {
+        writer.write_variant_record(&header, rec)?;
+    }
+    // Drop (rather than let it fall out of scope at the end of the function) so the
+    // BGZF trailer is flushed to disk before tabix reads the file below.
+    drop(writer);
+
+    log::debug!("Wrote {} variants to {:?}", records.len(), vcf_out);
+    index_vcf(vcf_out)?;
     Ok(())
 }
 
@@ -79,6 +134,7 @@ pub fn generate_controls_fastq(
     vcf: Option<&PathBuf>,
     profile: Option<&PathBuf>,
     variants: &Vec<RecordBuf>,
+    header: &vcf::Header,
     outdir: &PathBuf,
     coverage: u32,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
@@ -116,6 +172,12 @@ pub fn generate_controls_fastq(
     std::fs::create_dir_all(outdir)?;
     let variation = outdir.join(format!("{run_str}.simuscop"));
     write_input(variants, &variation, &base)?;
+
+    // `benchmark::silico_run_to_happy` always looks up the truth VCF under data/exp_raw,
+    // so write it here
+    let truth_vcf = PathBuf::from("data/exp_raw").join(format!("{base}.vcf.gz"));
+    std::fs::create_dir_all(truth_vcf.parent().unwrap())?;
+    write_as_vcf(variants, header, &truth_vcf)?;
 
     let config_path = outdir.join(format!("{base}.conf"));
     write_config(

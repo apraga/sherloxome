@@ -23,7 +23,7 @@ For each VCF whose filename contains recognisable run metadata (patient, sequenc
 
 1. Locates the truth VCF and BED file
 - for GIAB data, it's in  in `data/ref/`. Patient, sequencer, depth and capture kit must match. See [the filenaming scheme](050-filenaming.md).
-- for silico data, the reference VCF must be in `data/exp_raw`. Here are 2 example in our CI
+- for silico data, it use the VCF written during setup in `data/exp_raw`. Here are 2 example in our CI
     - For varben, output vcf is `HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`, reference VCF is `data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz`
     - For simuscop, output vcf is `nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`, reference VCF is `data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz`
 

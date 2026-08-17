@@ -61,11 +61,6 @@ jobs:
           nix shell .#default --command \
             ./target/release/sherloxome setup --config tests/config-varben-ci.toml
 
-      - name: Index varben truth VCF
-        run: |
-          nix shell .#default --command \
-            bcftools index -t data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben.vcf.gz
-
       - name: Run sarek pipeline
         run: |
           nix develop ./reproducible-sarek-germline --command \

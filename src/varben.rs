@@ -3,7 +3,7 @@
 //! Generate control variants by sampling clinvar and insert them into a real BAM
 
 use crate::run::{run_from_filename, run_to_string};
-use crate::silico::{nb_threads, sort_by_chromosome};
+use crate::silico::{index_vcf, nb_threads, sort_by_chromosome};
 use crate::{download_blocking, ref_dir};
 use noodles::bgzf;
 use noodles::fasta;
@@ -189,8 +189,12 @@ fn write_as_vcf_single(
     for rec in &records {
         writer.write_variant_record(&header, rec)?;
     }
+    // Drop (rather than let it fall out of scope at the end of the function) so the
+    // BGZF trailer is flushed to disk before tabix reads the file below.
+    drop(writer);
 
     log::debug!("Wrote {} variants to {:?}", records.len(), vcf_out);
+    index_vcf(&vcf_out)?;
     Ok(())
 }
 

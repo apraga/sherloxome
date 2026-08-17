@@ -18,6 +18,7 @@
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
                 bwa = pkgs.bwa;
                 bcftools=  pkgs.bcftools;
+                htslib = pkgs.htslib; # provides tabix
                 # Waiting for PR to be merged
                 inherit rtg-tools;
                 # rtg-tools = pkgs.rtg-tools;

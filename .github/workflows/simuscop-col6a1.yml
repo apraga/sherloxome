@@ -47,12 +47,6 @@ jobs:
           nix shell .#default --command \
             ./target/release/sherloxome setup --config tests/config-simuscop-ci.toml
 
-      - name: Prepare simuscop truth VCF
-        run: |
-          cp data/exp_raw/clinvar_agilent-col6a1.vcf.gz data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz
-          nix shell .#default --command \
-            bcftools index -t data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.vcf.gz
-
       - name: Run sarek pipeline
         run: |
           nix develop ./reproducible-sarek-germline --command \

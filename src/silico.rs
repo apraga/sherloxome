@@ -22,6 +22,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::thread;
 
 /// [silico.simuscop] — presence enables simuscop FASTQ generation
@@ -71,7 +72,7 @@ pub fn generate_controls(
     capture: &str,
     fasta: PathBuf,
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
-    check_deps(&["bwa", "samtools", "muteditor", "seqToProfile"]);
+    check_deps(&["bwa", "samtools", "tabix", "muteditor", "seqToProfile"]);
 
     let outdir = silico
         .outdir
@@ -137,13 +138,13 @@ fn generate_controls_simuscop(
     bed: &PathBuf,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
+    header: &vcf::Header,
     outdir: &PathBuf,
     simuscop: &SilicoSimuscopConfig,
     rows: &mut Vec<SamplesheetRow>,
 ) -> Result<(), Box<dyn Error>> {
     // simuscop's `coverage` parameter behaves like a peak/max rather than a realized mean:
-    // This factor was measured empirically on the COL6A1 capture (35 exons,
-    // ~88bp average, vs a ~350bp mean fragment size) and is NOT a universal constant
+    // This factor was measured empirically
     const MEAN_COVERAGE_REALIZATION: f64 = 0.65;
     let coverage = (simuscop.coverage as f64 / MEAN_COVERAGE_REALIZATION).round() as u32;
     log::debug!(
@@ -158,6 +159,7 @@ fn generate_controls_simuscop(
         simuscop.vcf.as_ref(),
         simuscop.profile.as_ref(),
         &variants,
+        header,
         &outdir,
         coverage,
     )?;
@@ -308,6 +310,19 @@ pub fn sort_by_chromosome(variants: &mut Vec<RecordBuf>) {
                 ap.cmp(&bp)
             })
     });
+}
+
+/// Tabix-index a bgzipped VCF (writes `{vcf}.tbi`), overwriting any existing index.
+pub fn index_vcf(vcf: &Path) -> Result<(), Box<dyn Error>> {
+    log::debug!("Indexing {:?}", vcf);
+    let status = Command::new("tabix")
+        .args(["-f", "-p", "vcf"])
+        .arg(vcf)
+        .status()?;
+    if !status.success() {
+        return Err(format!("tabix exited with status {status}").into());
+    }
+    Ok(())
 }
 
 /// Select n clinvar pathogenic SNV inside the capture kit 50bp apart

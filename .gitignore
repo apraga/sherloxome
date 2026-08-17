@@ -1,4 +1,7 @@
 doc/book
+data/exp_raw/*_simuscop.vcf.gz
+data/exp_raw/*_varben.vcf.gz
+*.sdf
 clinvar.vcf.*
 clinvar_agilent.vcf.*
 HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.*
