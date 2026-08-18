@@ -10,7 +10,7 @@ rtg_fasta = "data/ref/chr21.fna"
 
 # Configuration for raw GIAB patients data
 [real]
-patients = ["HG002"] #["HG001", "HG002", "HG003", "HG004", "HG005", "HG006", "HG007"]
+patients = [] # #["HG001", "HG002", "HG003", "HG004", "HG005", "HG006", "HG007"]
 depths = [50] #, 75, 100]
 captures = ["agilent"] #, "idt", "truseq"]
 sequencers = ["hiseq4000"] #, "novaseq"]
@@ -44,8 +44,8 @@ profile = "data/ref/hiseq4000_agilent-col6a1_50x.profile"
 coverage = 50
 
 # This section enables varben BAM editing (remove section to disable)
-[silico.varben]
-mindepth = 30
+# [silico.varben]
+# mindepth = 30
 
 # Define here the name of alls captures and the bed file
 [capture]

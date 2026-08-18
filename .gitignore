@@ -40,3 +40,5 @@ output_tiddit
 *.fna.bwt
 *.simuscop
 *_simuscop.conf
+*col6a1*.vcf*
+dbsnp*col6a1*

@@ -1,5 +1,6 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
+use crate::dbsnp;
 use crate::download_blocking;
 use crate::setup::{SamplesheetRow, silico_row};
 use crate::simuscop;
@@ -26,6 +27,7 @@ use std::process::Command;
 use std::thread;
 
 /// [silico.simuscop] — presence enables simuscop FASTQ generation
+/// dbSNP data is always enabled, see ([silico.simuscop.dbsnp]) and `doc/src/021-dbsnp.md`.
 #[derive(Deserialize, Debug)]
 pub struct SilicoSimuscopConfig {
     /// Path to a pre-built seqToProfile profile directory. Mutually exclusive with `vcf`.
@@ -72,7 +74,14 @@ pub fn generate_controls(
     capture: &str,
     fasta: PathBuf,
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
-    check_deps(&["bwa", "samtools", "tabix", "muteditor", "seqToProfile"]);
+    check_deps(&[
+        "bwa",
+        "samtools",
+        "tabix",
+        "bcftools",
+        "muteditor",
+        "seqToProfile",
+    ]);
 
     let outdir = silico
         .outdir
@@ -87,16 +96,16 @@ pub fn generate_controls(
         PathBuf::from(bed.clone()),
         50,
         silico.nb_variants,
-        vcf_out,
+        vcf_out.clone(),
     )?;
     if let Some(varben) = &silico.varben {
         generate_controls_varben(
-            &silico, &bed, capture, &fasta, &variants, &header, &outdir, varben, &mut rows,
+            &silico, capture, &fasta, &variants, &header, &outdir, varben, &mut rows,
         )?;
     }
     if let Some(simuscop) = &silico.simuscop {
         generate_controls_simuscop(
-            &silico, &bed, &fasta, &variants, &header, &outdir, simuscop, &mut rows,
+            &silico, &bed, &fasta, &variants, &header, &outdir, simuscop, &vcf_out, &mut rows,
         )?;
     }
     Ok(rows)
@@ -104,7 +113,6 @@ pub fn generate_controls(
 
 fn generate_controls_varben(
     silico: &SilicoConfig,
-    bed: &PathBuf,
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
@@ -117,7 +125,6 @@ fn generate_controls_varben(
         let bam_path = resolve_bam(bam_file, &outdir)?;
         let (fq1, fq2) = varben::generate_controls_bam(
             &bam_path,
-            bed,
             capture,
             fasta,
             variants,
@@ -141,6 +148,7 @@ fn generate_controls_simuscop(
     header: &vcf::Header,
     outdir: &PathBuf,
     simuscop: &SilicoSimuscopConfig,
+    clinvar_vcf: &PathBuf,
     rows: &mut Vec<SamplesheetRow>,
 ) -> Result<(), Box<dyn Error>> {
     // simuscop's `coverage` parameter behaves like a peak/max rather than a realized mean:
@@ -151,6 +159,12 @@ fn generate_controls_simuscop(
         "Scaling coverage {} -> {coverage} to convert to mean",
         simuscop.coverage
     );
+
+    let capture = silico.capture.as_str();
+    let dbsnp_vcf = dbsnp::sample_dbsnp(bed, capture, clinvar_vcf, outdir)?;
+    let snp_path = outdir.join(format!("dbsnp_{capture}.snp"));
+    dbsnp::write_snp_input(&dbsnp_vcf, &snp_path)?;
+
     let (fq1, fq2) = simuscop::generate_controls_fastq(
         &silico.bam_file,
         &bed,
@@ -162,6 +176,7 @@ fn generate_controls_simuscop(
         header,
         &outdir,
         coverage,
+        snp_path,
     )?;
     rows.push(silico_row("simuscop", fq1, fq2));
     Ok(())
@@ -382,6 +397,7 @@ fn read_vcf(path: &PathBuf) -> Result<(Vec<RecordBuf>, vcf::Header), Box<dyn Err
     Ok((records, header))
 }
 
+/// Write sampled clinvar as VCF and index it.
 /// Assume there is no chr prefix for chromosome
 fn write_sampled_clinvar_vcf(
     variants: &Vec<RecordBuf>,
@@ -396,7 +412,10 @@ fn write_sampled_clinvar_vcf(
     for record in variants {
         writer.write_variant_record(header, record)?;
     }
-    Ok(())
+    // Drop first: the inner bgzf writer only flushes its last block and writes the BGZF EOF
+    // marker on Drop, and tabix needs that on disk before it can index the file.
+    drop(writer);
+    index_vcf(vcf_out)
 }
 
 /// We cannot edit a record directly, recreate it without INFO and sample.
@@ -480,6 +499,7 @@ mod tests {
             "agilent-col6a1",
             Path::new("/data/simuscop_out"),
             50,
+            PathBuf::from("snp.txt"),
         )
         .unwrap();
 
@@ -522,10 +542,37 @@ mod tests {
             "sample",
             Path::new("/out"),
             100,
+            PathBuf::from("snp.txt"),
         )
         .unwrap();
 
         let content = fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("coverage = 100"));
+    }
+
+    #[test]
+    fn simuscop_config_includes_snp_when_set() {
+        let dir = std::env::temp_dir().join("simuscop_snp_test");
+        fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("test.conf");
+
+        simuscop::write_config(
+            &config_path,
+            Path::new("/ref/genome.fa"),
+            Path::new("/profile"),
+            Path::new("/variation"),
+            Path::new("/bed"),
+            "sample",
+            Path::new("/out"),
+            50,
+            PathBuf::from("/data/dbsnp_agilent-col6a1.snp"),
+        )
+        .unwrap();
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(
+            content.contains("snp = /data/dbsnp_agilent-col6a1.snp"),
+            "missing snp"
+        );
     }
 }

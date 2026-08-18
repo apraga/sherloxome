@@ -169,7 +169,19 @@ In the example above, the relevant part of the samplesheet is
 silico-simuscop,agilent-col6a1_simuscop,1,data/exp_raw/simuscop_agilent-col6a1/agilent-col6a1_1.fq.gz,data/exp_raw/simuscop_agilent-col6a1/agilent-col6a1_2.fq.gz
 ```
 
-Simuscop also requires a file with SNP. We download dbSNP and keep relevant variants [as documented here](021-dbsnp.md).
+Simuscop can also add background SNPs from dbSNP on top of the ClinVar variants above, by adding
+a `[silico.simuscop.dbsnp]` section:
+
+```toml
+[silico.simuscop.dbsnp]
+# Local bgzipped+tabix-indexed dbSNP VCF, or a remote URL. Defaults to the latest NCBI
+# GRCh38 dbSNP release; a tabix range query fetches only the capture kit region.
+# vcf = "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz"
+# chr -> Refseq accession mapping. Defaults to data/ref/chromosome_mapping_GRCh38.p14.txt
+# mapping = "data/ref/chromosome_mapping_GRCh38.p14.txt"
+```
+
+We download dbSNP and keep relevant variants [as documented here](021-dbsnp.md).
 
 ### Varben specific configuration
 

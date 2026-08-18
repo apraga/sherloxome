@@ -108,12 +108,14 @@ pub fn write_config(
     name: &str,
     output_dir: &Path,
     coverage: u32,
+    dbsnp_vcf: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     let threads = nb_threads();
     let mut w = BufWriter::new(File::create(config_path)?);
     writeln!(w, "ref = {}", fasta.display())?;
     writeln!(w, "profile = {}", profile_dir.display())?;
     writeln!(w, "variation = {}", variation.display())?;
+    writeln!(w, "snp = {}", dbsnp_vcf.display())?;
     writeln!(w, "target = {}", bed.display())?;
     writeln!(w, "name = {}", name)?;
     writeln!(w, "output = {}", output_dir.display())?;
@@ -137,6 +139,7 @@ pub fn generate_controls_fastq(
     header: &vcf::Header,
     outdir: &PathBuf,
     coverage: u32,
+    snp_file: PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     let profile_dir = if let Some(p) = profile {
         p.clone()
@@ -189,6 +192,7 @@ pub fn generate_controls_fastq(
         &base,
         outdir,
         coverage,
+        snp_file,
     )?;
 
     run_simu_reads(&config_path, &base, outdir)

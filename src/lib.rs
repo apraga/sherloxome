@@ -11,6 +11,7 @@ use url::Url;
 pub mod cli;
 use std::error::Error;
 pub mod baid2020;
+pub mod dbsnp;
 pub mod giab;
 pub mod plot;
 pub mod setup;

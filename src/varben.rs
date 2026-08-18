@@ -30,7 +30,6 @@ use std::process::{Command, Stdio};
 
 pub fn generate_controls_bam(
     bam: &PathBuf,
-    bed: &PathBuf,
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
@@ -64,7 +63,7 @@ pub fn generate_controls_bam(
         Ok((fq1, fq2))
     } else {
         log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(&bam, &bed, capture, fasta, variants, header, mindepth)?;
+        let new_bam = edit_bam(&bam, capture, fasta, variants, header, mindepth)?;
         bam_to_fastq(new_bam, fq1, fq2)
     }
 }
@@ -77,7 +76,6 @@ pub fn generate_controls_bam(
 /// If `clinvar_vcf` is None the file is downloaded from NCBI and stored in `outdir`.
 pub fn edit_bam(
     bam: &PathBuf,
-    bed: &PathBuf,
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,

@@ -49,13 +49,13 @@ enum Commands {
 fn read_config(fname: &PathBuf) -> Result<Config, Box<dyn Error>> {
     let content = std::fs::read_to_string(fname)
         .map_err(|e| format!("Cannot read config {}: {e}", fname.display()))?;
-    let conf: Config = toml::from_str(&content)
-        .map_err(|e| format!("Invalid config {}: {e}", fname.display()))?;
+    let conf: Config =
+        toml::from_str(&content).map_err(|e| format!("Invalid config {}: {e}", fname.display()))?;
     conf.validate()?;
     Ok(conf)
 }
 
-/// Read CLI arguments and call relevant functions
+/// Read CLI arguments and call subfunctions
 pub fn process_cli() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     match &cli.command {
