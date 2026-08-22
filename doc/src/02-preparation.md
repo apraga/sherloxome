@@ -1,12 +1,18 @@
-# Get raw data
+# Prepare FASTQ
 
-Run `sherloxome setup` to download reference data and/or generate in silico controls:
+## Quick start 
+To download reference data and/or generate in silico controls, edit `config.toml` to select which step you want.
+Then run the CLI with `setup`. We suggest using nix:
 
 ```bash
-sherloxome setup -c config.toml
+nix shell .#default --command cargo run --release -- setup
 ```
 
-This command writes `samplesheet.csv` for the variant calling pipeline. Here's an example combining 1 real patient and 2 insilico configurations
+This command writes `samplesheet.csv` for the variant calling pipeline
+
+## Details example
+
+Here's an example combining 1 real patient and 2 insilico configurations. The samplesheet generated will look like:
 
 ```csv
 patient,sample,lane,fastq_1,fastq_2
@@ -15,8 +21,51 @@ silico-varben,HG002_hiseq4000_agilent-col6a1_50x_varben_varben,1,data/exp_raw/HG
 silico-simuscop,nopatient_hiseq4000_agilent-col6a1_50x_simuscop_simuscop,1,data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop_1.fq.gz,data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop_2.fq.gz
 ```
 
+And the correspondig `config.toml`:
+
+```toml
+ # URL to fasta, or link to local version, otherwise download it from NCBI
+fasta = "data/ref/GCA_000001405.15_GRCh38_full_analysis_set.fna"
+
+# Configuration for raw GIAB patients data
+[real]
+patients = [HG002] 
+depths = [50] 
+captures = ["agilent"] 
+sequencers = ["hiseq4000"] 
+
+[silico]
+# VCF containing clinvar variants. 
+clinvar = "data/exp_raw/clinvar.vcf.gz"
+# Number of random clinvar variants to insert into the BAM file. Default is 1000
+nb_variants = 1000
+# Capture kit name (the BED must be defined in [capture] below)
+capture = "agilent"
+# A BAM file is always required for varben as it will will modify it
+bam_file = "data/exp_raw/HG002_hiseq4000_agilent_50x.bam"
+
+# This section enables simuscop FASTQ generation
+[silico.simuscop]
+# Pre-built seqToProfile profile directory. 
+profile = "data/ref/hiseq4000_agilent_50x.profile"
+# Sequencing coverage
+coverage = 50
+
+# This section enables varben BAM editing
+[silico.varben]
+mindepth = 50
+
+# Define here the name of alls captures and the bed file
+[capture]
+# Those values are mandatory for GIAB data (Baid 2020)
+idt = "data/capture/idt_capture.grch38.bed"
+truseq = "data/capture/truseq-dna-exome-targeted-regions-manifest-v1-2-lifted-grch38.bed"
+agilent = "data/capture/agilent.targets.grch38.bed"
+# For testing
+agilent-col6a1 = "data/capture/agilent-col6a1.targets.grch38.bed"
+```
+
 See also the [filenaming scheme](050-filenaming.md).
----
 
 ## Real patient data (GIAB)
 
