@@ -40,13 +40,3 @@ capture = "agilent"
 bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
 ```
 
-
-## Reference genome
-
-Set the reference FASTA path in `config.toml`:
-
-```toml
-fasta = "data/ref/GCA_000001405.15_GRCh38_full_analysis_set.fna"
-```
-
-If the path does not exist, sherloxome downloads the GRCh38 full analysis set from NCBI (~3 GB compressed) and decompresses it. The BWA index (~10 GB) is also downloaded automatically.

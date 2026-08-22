@@ -21,6 +21,12 @@ silico-varben,HG002_hiseq4000_agilent-col6a1_50x_nohardclip_varben,1,data/exp_ra
 5. The edited BAM is converted to paired FASTQ via `samtools fastq`
 6. A VCF of successfully inserted variants is written alongside the FASTQ
 
+BAM files can be found [on Google Cloud for data from Baid et al, 2020](https://console.cloud.google.com/storage/browser/brain-genomics-public/research/sequencing/grch38/bam;tab=objects?pageState=(%22StorageObjectListTable%22:(%22f%22:%22%255B%255D%22))&prefix=&forceOnObjectsSortingFiltering=false). Those must be renamed to follow our [filenaming scheme](050-filenaming.md). For example,  [HG002 data sequenced on Hiseq 4000 with Agilent capture kit](https://storage.googleapis.com/brain-genomics-public/research/sequencing/grch38/bam/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam) should be renamed with :
+
+```bash
+mv HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam HG002_hiseq4000_agilent_50x.bam
+```
+
 # Output files
 
 By default, output is written to `data/exp_raw/`. Override with `outdir`:
