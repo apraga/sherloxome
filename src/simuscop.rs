@@ -204,30 +204,35 @@ fn run_simu_reads(
     name: &str,
     output_dir: &Path,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let fq1 = compress_fastq(&output_dir.join(format!("{name}_1.fq")))?;
-    let fq2 = compress_fastq(&output_dir.join(format!("{name}_2.fq")))?;
-    if fq1.exists() && fq2.exists() {
+    let raw_fq1 = output_dir.join(format!("{name}_1.fq"));
+    let raw_fq2 = output_dir.join(format!("{name}_2.fq"));
+    let gz_fq1 = PathBuf::from(format!("{}.gz", raw_fq1.display()));
+    let gz_fq2 = PathBuf::from(format!("{}.gz", raw_fq2.display()));
+
+    if gz_fq1.exists() && gz_fq2.exists() {
         log::info!(
             "Skipping BAM editing as output fastq already exists {:?}, {:?}",
-            fq1,
-            fq2
+            gz_fq1,
+            gz_fq2
         );
-        Ok((fq1, fq2))
-    } else {
-        let status = Command::new("simuReads")
-            .arg(
-                config_path
-                    .to_str()
-                    .ok_or("Invalid simuReads config path")?,
-            )
-            .status()?;
-
-        if !status.success() {
-            return Err(format!("simuReads exited with status {status}").into());
-        }
-
-        Ok((fq1, fq2))
+        return Ok((gz_fq1, gz_fq2));
     }
+
+    let status = Command::new("simuReads")
+        .arg(
+            config_path
+                .to_str()
+                .ok_or("Invalid simuReads config path")?,
+        )
+        .status()?;
+
+    if !status.success() {
+        return Err(format!("simuReads exited with status {status}").into());
+    }
+
+    let fq1 = compress_fastq(&raw_fq1)?;
+    let fq2 = compress_fastq(&raw_fq2)?;
+    Ok((fq1, fq2))
 }
 
 /// Gzip-compress a plain fastq file produced by simuReads, removing the uncompressed
