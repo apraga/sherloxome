@@ -4,7 +4,8 @@
 //! Used by [`crate::simuscop`]).
 //!
 //! dbSNP uses RefSeq accessions for chromosome names (e.g. `NC_000021.9` for chr21), so a
-//! mapping file is required. See `doc/src/021-dbsnp.md`.
+//! mapping file is required. See the [dbSNP setup
+//! guide](https://apraga.github.io/sherloxome/022-dbsnp.html#configuration).
 //!
 //! dbSNP is never downloaded completely, only data in the capture kit, and the rest (chromosome
 //! renaming, AF filtering, excluding clinvar) is delegated to `bcftools` rather than parsed here.
@@ -15,9 +16,7 @@ use std::process::Command;
 use crate::silico::index_vcf;
 
 /// Latest NCBI dbSNP GRCh38
-const DBSNP_URL: &str = "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz";
-/// chr -> RefSeq mapping
-const MAPPING_FILE: &str = "data/ref/chromosome_mapping_GRCh38.p14.txt";
+// const DBSNP_URL: &str = "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz";
 
 /// Run a shell pipeline, e.g. "cmd1 | cmd2 > out"
 fn run(cmd: &str) -> Result<(), Box<dyn Error>> {
@@ -28,78 +27,51 @@ fn run(cmd: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Revert chromosome mapping RefSeq->chr `old\tnew` file, for `bcftools annotate --rename-chrs`
-fn revert_chr_mapping(mapping_path: &Path, rename_out: &Path) -> Result<(), Box<dyn Error>> {
-    run(&format!(
-        "awk -F'\\t' '{{gsub(/\\r/,\"\"); print $2\"\\t\"$1}}' {} > {}",
-        mapping_path.display(),
-        rename_out.display(),
-    ))?;
-    Ok(())
-}
-
-/// Convert capture to RefSeq notation, for `bcftools view -R`
-fn map_capture_refseq(
-    mapping_path: &Path,
-    bed: &Path,
-    regions_out: &Path,
-) -> Result<(), Box<dyn Error>> {
-    run(&format!(
-        "awk -F'\\t' 'NR==FNR{{gsub(/\\r/,\"\"); m[$1]=$2; next}} $1 in m{{print m[$1]\"\\t\"$2\"\\t\"$3}}' {} {} > {}",
-        mapping_path.display(),
-        bed.display(),
-        regions_out.display(),
-    ))
-}
-
 /// Query dbSNP restricted to the capture kit, keep common SNVs absent from `clinvar_vcf`
-/// (bgzipped + tabix-indexed), and rewrite chromosomes to `chr` notation.
-/// Output is `{outdir}/dbsnp_{capture}.vcf.gz` (+ `.tbi`)
+/// dbSNP has already been processed to filter only common SNV in the capture kit.
+/// To use it with your own capture kit, you need the following command:
+/// ```bash
+///  # 1. capture bed: chr -> RefSeq (for `bcftools view -R`)
+///  awk -F'\t' 'NR==FNR{gsub(/\r/,""); m[$1]=$2; next} $1 in m{print m[$1]"\t"$2"\t"$3}' \
+///      "$MAPPING" "$BED" > ${OUT}.regions.bed
+///  # 2. build the reverse map: RefSeq -> chr (for `bcftools annotate --rename-chrs`)
+///  awk -F'\t' '{gsub(/\r/,""); print $2"\t"$1}' "$MAPPING" > ${OUT}.rename.txt
+///  # 3. filter dbSNP to the capture kit, common variants, SNVs only
+///  bcftools view -v snps -i 'COMMON=1' -R ${OUT}.regions.bed "$DBSNP" -Oz -o ${OUT}.refseq.vcf.gz
+///  # 4. convert result back to chr notation
+///  bcftools annotate --rename-chrs ${OUT}.rename.txt ${OUT}.refseq.vcf.gz -Oz -o ${OUT}.vcf.gz
+///  # 5. index
+///  bcftools index -t ${OUT}.vcf.gz
+/// ```bash
 pub fn sample_dbsnp(
-    bed: &Path,
     capture: &str,
     clinvar_vcf: &Path,
     outdir: &Path,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    let vcf_out = outdir.join(format!("dbsnp_{capture}.vcf.gz"));
+    let vcf_out = PathBuf::from(format!("data/exp_raw/dbsnp_{capture}.vcf.gz"));
     if vcf_out.exists() {
-        log::debug!("Skip dbSNP query as output already exists: {:?}", vcf_out);
-        return Ok(vcf_out);
+        log::info!("Skipping dbsnp querying as {:?} already exists", vcf_out);
+        Ok(vcf_out)
+    } else {
+        let common = PathBuf::from(format!("data/exp_raw/dbsnp_{capture}_common.vcf.gz"));
+        if !common.exists() {
+            let msg = format!("{} should exist. The version for agilent, IDT and truseq have been shipped in the code in data/exp_raw.
+            If you are using another capture kit, see the documentation to filter dbSNP data", common.display());
+            log::error!("{msg}");
+            Err(msg.into())
+        } else {
+            std::fs::create_dir_all(outdir)?;
+            run(&format!(
+                "bcftools isec -C -w1 -Oz -o {} {} {}",
+                vcf_out.display(),
+                common.display(),
+                clinvar_vcf.display(),
+            ))?;
+            index_vcf(&vcf_out)?;
+
+            Ok(vcf_out)
+        }
     }
-    std::fs::create_dir_all(outdir)?;
-
-    let mapping_path = PathBuf::from(MAPPING_FILE);
-    let regions = outdir.join(format!("dbsnp_{capture}.regions.bed"));
-    let rename_map = outdir.join(format!("dbsnp_{capture}.rename.txt"));
-    map_capture_refseq(&mapping_path, bed, &regions)?;
-    revert_chr_mapping(&mapping_path, &rename_map)?;
-
-    log::info!("Querying dbSNP for capture kit regions from {MAPPING_FILE}...");
-    let common_refseq = outdir.join(format!("dbsnp_{capture}.common_refseq.vcf.gz"));
-    let common = outdir.join(format!("dbsnp_{capture}.common.vcf.gz"));
-    run(&format!(
-        "bcftools view -v snps -i 'COMMON=1' -R {} {DBSNP_URL} -Oz -o {}",
-        regions.display(),
-        common_refseq.display(),
-    ))?;
-    run(&format!(
-        "bcftools annotate --rename-chrs {} {} -Oz -o {}",
-        rename_map.display(),
-        common_refseq.display(),
-        common.display(),
-    ))?;
-    index_vcf(&common)?;
-
-    // Drop sampled Clinvar variant
-    run(&format!(
-        "bcftools isec -C -w1 -Oz -o {} {} {}",
-        vcf_out.display(),
-        common.display(),
-        clinvar_vcf.display(),
-    ))?;
-    index_vcf(&vcf_out)?;
-
-    Ok(vcf_out)
 }
 
 /// Write simuscop's SNP background format (see SimuSCoP_User_Guide.pdf §4.2.2):

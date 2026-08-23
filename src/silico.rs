@@ -27,7 +27,8 @@ use std::process::Command;
 use std::thread;
 
 /// [silico.simuscop] — presence enables simuscop FASTQ generation
-/// dbSNP data is always enabled, see ([silico.simuscop.dbsnp]) and `doc/src/021-dbsnp.md`.
+/// dbSNP data is always enabled, see ([silico.simuscop.dbsnp]) and the [dbSNP setup
+/// guide](https://apraga.github.io/sherloxome/022-dbsnp.html#configuration).
 #[derive(Deserialize, Debug)]
 pub struct SilicoSimuscopConfig {
     /// Path to a pre-built seqToProfile profile directory. Mutually exclusive with `vcf`.
@@ -161,7 +162,7 @@ fn generate_controls_simuscop(
     );
 
     let capture = silico.capture.as_str();
-    let dbsnp_vcf = dbsnp::sample_dbsnp(bed, capture, clinvar_vcf, outdir)?;
+    let dbsnp_vcf = dbsnp::sample_dbsnp(capture, clinvar_vcf, outdir)?;
     let snp_path = outdir.join(format!("dbsnp_{capture}.snp"));
     dbsnp::write_snp_input(&dbsnp_vcf, &snp_path)?;
 

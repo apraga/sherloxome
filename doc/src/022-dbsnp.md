@@ -8,36 +8,29 @@ dbSNP, keeping only
 3. absent from our clinvar selection, so the two variant lists never collide on the same
    position
 
-Rather than downloading the ~30GB dbSNP VCF, `sherloxome` runs a remote `tabix` query
-restricted to the capture kit regions, which only fetches the required byte ranges over HTTP.
-
-Note that dbSNP uses Refseq naming convention for chromosome, so a mapping file is required
-to translate to/from `chr` notation. This file is available in
-`data/ref/chromosome_mapping_GRCh38.p14.txt`. It can be (re)generated with
+The CLI requires an existing file for filtered dbSNP data to match the capture kit and only keep common variants.
+dbSNP data for the agilent, IDT and truseq capture kit are already alvailable in the source code. For another capture kit, run
 
 ```bash
-curl -s "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_assembly_report.txt" | awk -F'\t' '$2=="assembled-molecule"{print $NF"\t"$7}' > data/ref/chromosome_mapping_GRCh38.p14.txt
+  # 0. Download dbSNP
+  curl "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz"
+ # 1. capture bed: chr -> RefSeq (for `bcftools view -R`)
+ awk -F'\t' 'NR==FNR{gsub(/\r/,""); m[$1]=$2; next} $1 in m{print m[$1]"\t"$2"\t"$3}' \
+     "$MAPPING" "$BED" > ${OUT}.regions.bed
+
+ # 2. build the reverse map: RefSeq -> chr (for `bcftools annotate --rename-chrs`)
+ awk -F'\t' '{gsub(/\r/,""); print $2"\t"$1}' "$MAPPING" > ${OUT}.rename.txt
+
+ # 3. filter dbSNP to the capture kit, common variants, SNVs only
+ bcftools view -v snps -i 'COMMON=1' -R ${OUT}.regions.bed "$DBSNP" -Oz -o ${OUT}.refseq.vcf.gz
+
+ # 4. convert result back to chr notation
+ bcftools annotate --rename-chrs ${OUT}.rename.txt ${OUT}.refseq.vcf.gz -Oz -o ${OUT}.vcf.gz
+
+ # 5. index
+ bcftools index -t ${OUT}.vcf.gz
 ```
 
-## Configuration
+Rename the output file to `data/exp_raw/dbsnp_{CAPTURE}_common.vcf.gz`.
 
-Enable this by adding a `[silico.simuscop.dbsnp]` section:
-
-```toml
-[silico.simuscop.dbsnp]
-# Local bgzipped+tabix-indexed dbSNP VCF, or a remote URL.
-# Defaults to the latest NCBI GRCh38 dbSNP release.
-# vcf = "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz"
-# chr -> Refseq accession mapping. Defaults to data/ref/chromosome_mapping_GRCh38.p14.txt
-# mapping = "data/ref/chromosome_mapping_GRCh38.p14.txt"
-```
-
-## Output files
-
-- `data/exp_raw/dbsnp_{capture}.vcf.gz` (+ `.tbi`) — the filtered dbSNP variants, in `chr`
-  notation, sorted and bgzipped
-- `data/exp_raw/dbsnp_{capture}.snp` — the same variants converted to simuscop's own SNP
-  format and passed as the `snp` parameter to `simuReads` (see `SimuSCoP_User_Guide.pdf` §4.2.2)
-
-Both are skipped (existing files reused) on subsequent runs, matching the ClinVar sampling
-step.
+The CLI will remove clinvar variants from this VCF and write the final result as a plain text file for Simuscop.

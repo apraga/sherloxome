@@ -2,11 +2,11 @@
 
 - [Introduction](00-introduction.md)
 - [Install dependencies](01-dependencies.md)
-- [Prepare FASTQ](02-preparation.md) 
+- [Prepare FASTQ](02-preparation.md)
   - [Real patients](020-giab.md)
   - [Silico data](021-silico.md)
     - [FASTQ from patient with Varben](0210-varben.md)
-    - [Silico FASTQ with simuscop](0210-simuscop.md)
+    - [Silico FASTQ with simuscop](0211-simuscop.md)
   - [Configuration file](022-configuration.md)
 - [Run a pipeline](04-pipeline.md)
 - [Evaluate performance](05-benchmark.md) (see [the filenaming scheme](050-filenaming.md))
