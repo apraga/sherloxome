@@ -2,9 +2,9 @@
  # We need a full fasta for silico data to avoid remapping error
 fasta = "data/ref/GCA_000001405.15_GRCh38_full_analysis_set.fna"
 # For CI, we do not need the full fasta during benchmarking. To avoid duplicating the FASTA and
-# running out-of-memory, use a smaller reference 
+# running out-of-memory, use a smaller reference
 # `rtg format` copies the whole sequence to disk, unlike hap.py's --reference
-rtg_fasta = "data/ref/chr21.fna"
+# rtg_fasta = "data/ref/chr21.fna"
 
 # Configuration for raw GIAB patients data
 [real]
@@ -16,25 +16,23 @@ sequencers = ["hiseq4000"] #, "novaseq"]
 # Generate control data from sampled clinvar. Result will be a fastq in data/exp_raw
 [silico]
 # VCF containing clinvar variants. If not set, the VCF will be downloaded from NCBI
-clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
+clinvar = "data/exp_raw/clinvar.vcf.gz"
 # Number of random clinvar variants to insert into the BAM file. Default is 1000
-nb_variants = 2
+nb_variants = 1000
 # URL to fasta, or link to local version, otherwise download it from NCBI
 # fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
 # Capture kit name (the BED must be defined in [capture] below)
-capture = "agilent-col6a1"
-# capture = "agilent"
+capture = "agilent"
 # A BAM file is always required for varben as it will will modify it
 # Simuscop will define a sequencing profile from it if it does not exist.
 # Can be a URL or a local path.
-bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip.bam"
-# bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
+bam_file = "data/exp_raw/HG002_hiseq4000_agilent_50x.bam"
 
 # This section enables simuscop FASTQ generation (remove section to disable)
 [silico.simuscop]
 # Pre-built seqToProfile profile directory. If set, seqToProfile is skipped.
 # The profile must follow the filenaming scheme
-profile = "data/ref/hiseq4000_agilent-col6a1_50x.profile"
+profile = "data/ref/hiseq4000_agilent_50x.profile"
 # VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
 # Required when profile is absent; seqToProfile is run to build the profile.
 # vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
@@ -52,5 +50,5 @@ idt = "data/capture/idt_capture.grch38.bed"
 truseq = "data/capture/truseq-dna-exome-targeted-regions-manifest-v1-2-lifted-grch38.bed"
 agilent = "data/capture/agilent.targets.grch38.bed"
 # For testing
-agilent-col6a1 = "data/capture/agilent-col6a1.targets.grch38.bed"
+agilent-col6a1 = "data/capture/agilent.targets.grch38.bed"
 

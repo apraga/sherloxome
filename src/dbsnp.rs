@@ -75,14 +75,17 @@ pub fn sample_dbsnp(
     revert_chr_mapping(&mapping_path, &rename_map)?;
 
     log::info!("Querying dbSNP for capture kit regions from {MAPPING_FILE}...");
+    let common_refseq = outdir.join(format!("dbsnp_{capture}.common_refseq.vcf.gz"));
     let common = outdir.join(format!("dbsnp_{capture}.common.vcf.gz"));
     run(&format!(
-        "bcftools view -R {} {DBSNP_URL} \
-         | bcftools annotate --rename-chrs {} \
-         | bcftools norm -m -any \
-         | bcftools view -v snps -i 'COMMON=1' -Oz -o {}",
+        "bcftools view -v snps -i 'COMMON=1' -R {} {DBSNP_URL} -Oz -o {}",
         regions.display(),
+        common_refseq.display(),
+    ))?;
+    run(&format!(
+        "bcftools annotate --rename-chrs {} {} -Oz -o {}",
         rename_map.display(),
+        common_refseq.display(),
         common.display(),
     ))?;
     index_vcf(&common)?;
