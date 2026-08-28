@@ -121,6 +121,17 @@ fn run_to_happy(
     }
 }
 
+/// Derive a unique hap.py output prefix from a query VCF's own filename.
+///
+/// `run_to_string` is not unique if there are 2 VCFs with the same basename, one with .vcf.gx and one with .filtered.vcf.gz
+fn happy_prefix(query_vcf: &Path) -> Result<String, Box<dyn Error>> {
+    query_vcf
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.trim_end_matches(".vcf.gz").to_string())
+        .ok_or_else(|| format!("invalid query VCF filename: {:?}", query_vcf).into())
+}
+
 /// For a GIB run, find reference data
 fn real_run_to_happy(
     run: Run,
@@ -143,7 +154,7 @@ fn real_run_to_happy(
             )
         })?;
     Ok(HappyRunSetup {
-        prefix: run_to_string(&run),
+        prefix: happy_prefix(&query_vcf)?,
         query_vcf,
         query_bed,
         truth_vcf,
@@ -161,8 +172,7 @@ fn silico_run_to_happy(
     query_vcf: PathBuf,
     captures: &HashMap<String, String>,
 ) -> Result<HappyRunSetup, Box<dyn Error>> {
-    let prefix = run_to_string(&run);
-    let truth_vcf = PathBuf::from("data/exp_raw").join(format!("{}.vcf.gz", prefix));
+    let truth_vcf = PathBuf::from("data/exp_raw").join(format!("{}.vcf.gz", run_to_string(&run)));
     if !truth_vcf.exists() {
         return Err(format!("reference VCF {} not found", truth_vcf.display()).into());
     }
@@ -177,7 +187,7 @@ fn silico_run_to_happy(
         })?;
     let truth_bed = query_bed.clone();
     Ok(HappyRunSetup {
-        prefix,
+        prefix: happy_prefix(&query_vcf)?,
         query_vcf,
         query_bed,
         truth_vcf,
@@ -218,11 +228,24 @@ fn merge_summaries(
         .map(|path| -> Result<LazyFrame, Box<dyn Error>> {
             let run =
                 run_from_filename(&path).ok_or("Failed to extract run from summary filename")?;
+            // `run_from_filename` only matches the SAMPLE_SEQUENCER_CAPTURE_DEPTH{_SILICO}
+            // portion, so distinct query VCFs for the same run (e.g. the raw and
+            // `.filtered` HaplotypeCaller output) share identical patient/capture/sequencer/depth
+            // columns. Carry the full hap.py prefix (the summary filename minus the
+            // `.summary.csv` suffix) through as its own column so those rows stay
+            // distinguishable in merged.csv instead of looking like duplicates.
+            let prefix = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|n| n.strip_suffix(".summary.csv"))
+                .ok_or("Failed to derive prefix from summary filename")?
+                .to_string();
             Ok(CsvReadOptions::default()
                 .with_has_header(true)
                 .try_into_reader_with_file_path(Some(path))?
                 .finish()?
                 .lazy()
+                .with_column(lit(prefix).alias("prefix"))
                 .with_column(lit(run.sample).alias("patient"))
                 .with_column(lit(run.capture.to_string()).alias("capture"))
                 .with_column(lit(run.sequencer.to_string()).alias("sequencer"))
