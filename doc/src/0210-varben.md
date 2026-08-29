@@ -1,7 +1,7 @@
 # FASTQ from patient with Varben
 
-```toml
  This section enables varben BAM editing (remove section to disable)
+```toml
 [silico.varben]
 mindepth = 30
 ```
@@ -11,6 +11,9 @@ In the example above, the relevant part of the samplesheet is
 ```csv
 silico-varben,HG002_hiseq4000_agilent-col6a1_50x_nohardclip_varben,1,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip_1.fq.gz,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip_2.fq.gz
 ```
+
+**Some variants may not in the FASTQ**. Those which failed to be inserted are available in `data/exp_raw` as txt file. For example  `data/exp_raw/HG002_hiseq4000_agilent_50x_varben_failed.txt`.
+Variants successfully inserted in the BAM are available as a VCF is `data/exp_raw`, for example `data/exp_raw/HG002_hiseq4000_agilent_50x_varben.vcf.gz`. 
 
 ## Varben algorithm
 
@@ -36,13 +39,13 @@ By default, output is written to `data/exp_raw/`. Override with `outdir`:
 outdir = "silico"
 ```
 
-Key outputs:
+| File                                    | Description                           |
+|-----------------------------------------|---------------------------------------|
+| `clinvar_{capture}.vcf.gz`              | Sampled ClinVar variants (truth VCF)  |
+| `clinvar_{capture}.mut`                 | Variants to insert                    |
+| `clinvar_{capture}_varben_failed.txt`          | Variants to insert                    |
+| `varben/edit.sorted.bam`                | BAM with variants injected            |
+| `{sample}.vcf.gz`                       | VCF of successfully inserted variants |
+| `{sample}_1.fq.gz` / `{sample}_2.fq.gz` | Paired FASTQ ready for the pipeline   |
 
-| File | Description |
-|------|-------------|
-| `clinvar_{capture}.vcf.gz` | Sampled ClinVar variants (truth VCF) |
-| `clinvar_{capture}.mut` | Mutation file for muteditor |
-| `varben/edit.sorted.bam` | BAM with variants injected |
-| `{sample}_success.vcf.gz` | VCF of successfully inserted variants |
-| `{sample}_1.fq.gz` / `{sample}_2.fq.gz` | Paired FASTQ ready for the pipeline |
 

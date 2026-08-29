@@ -42,3 +42,4 @@ output_tiddit
 *_simuscop.conf
 *col6a1*.vcf*
 dbsnp*col6a1*
+tests/

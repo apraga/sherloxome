@@ -92,10 +92,26 @@ pub fn edit_bam(
     ensure_bwa_index(&fasta)?;
     let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta, mindepth)?;
 
+    backup_failures(&bam, &outdir)?;
     write_as_vcf(bam, header, outdir, &fasta)?;
 
     Ok(edited_bam)
 }
+
+fn backup_failures(
+    bam: &PathBuf,
+    outdir: &PathBuf) -> Result<(), Box<dyn Error>>{
+    let failed = outdir.join("varben").join("invalid_mutation.txt");
+    let bam_stem = bam.file_stem().unwrap().to_string_lossy();
+    let failed_ = outdir.join(format!("{bam_stem}_varben_failed.txt"));
+    if failed.exists() {
+        std::fs::copy(&failed, &failed_)?;
+    } else {
+        log::warn!("Failed to backup {:?}", failed);
+    }
+    Ok(())
+}
+
 /// Write a mutation file for varben using sampled clinvar data
 
 pub fn write_input(variants: &Vec<RecordBuf>, mut_out: &PathBuf) -> Result<(), Box<dyn Error>> {

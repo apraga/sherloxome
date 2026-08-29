@@ -37,6 +37,11 @@ Simuscop will generate a FASTQ according to a profile. `sherloxome` ships severa
 | data/exp_raw/novaseq-idt-100x.profile       | novaseq    | IDT     | 100x  |
 | data/exp_raw/novaseq-truseq-100x.profile    | novaseq    | Truseq  | 100x  |
 
+Variants inserted in the FASTQ are available as a VCF in `data/exp_raw`, for example 
+`data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop.vcf.gz`
+
+## Creating your own simuscop profile 
+
 To create your own profile, a BAM, VCF are required
 
 ``` toml

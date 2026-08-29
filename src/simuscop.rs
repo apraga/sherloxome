@@ -51,11 +51,9 @@ pub fn write_input(variants: &[RecordBuf], out: &Path, sample: &str) -> Result<(
     Ok(())
 }
 
-/// Write the variants used to drive simuReads as a bgzipped VCF, giving a ground-truth
-/// reference VCF for benchmarking with hap.py (see `benchmark::silico_run_to_happy`).
-/// simuReads inserts every requested variant (unlike varben, which can fail to insert some),
-/// so the input variant list doubles as the truth set. All variants are heterozygous,
-/// matching the "het" zygosity always emitted by `write_variant`.
+/// Write the variants inserted by simusscop as a bgzipped VCF
+/// All of them should be inserted, contrary to varben.
+/// All variants are heterozygous.
 pub fn write_as_vcf(
     variants: &[RecordBuf],
     header: &vcf::Header,
