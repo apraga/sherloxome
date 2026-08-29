@@ -282,7 +282,7 @@ fn run_insert_variants(
         "-m",
         mut_str,
         "-p",
-        "1",
+        &nb_threads().to_string(),
         "-b",
         bam_str,
         "-r",
