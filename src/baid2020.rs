@@ -133,6 +133,9 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
+        to_run(Patient::HG001, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(Patient::HG001, Sequencer::Novaseq, Capture::Idt, 50, None),
+        to_run(Patient::HG001, Sequencer::Novaseq, Capture::Idt, 75, None),
         to_run(
             Patient::HG001,
             Sequencer::Novaseq,
@@ -183,6 +186,9 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
+        to_run(Patient::HG002, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(Patient::HG002, Sequencer::Novaseq, Capture::Idt, 50, None),
+        to_run(Patient::HG002, Sequencer::Novaseq, Capture::Idt, 75, None),
         to_run(
             Patient::HG002,
             Sequencer::Novaseq,
@@ -233,6 +239,9 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
+        to_run(Patient::HG003, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(Patient::HG003, Sequencer::Novaseq, Capture::Idt, 50, None),
+        to_run(Patient::HG003, Sequencer::Novaseq, Capture::Idt, 75, None),
         to_run(
             Patient::HG003,
             Sequencer::Novaseq,
@@ -283,6 +292,9 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
+        to_run(Patient::HG004, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(Patient::HG004, Sequencer::Novaseq, Capture::Idt, 50, None),
+        to_run(Patient::HG004, Sequencer::Novaseq, Capture::Idt, 75, None),
         to_run(
             Patient::HG004,
             Sequencer::Novaseq,
@@ -333,6 +345,9 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
+        to_run(Patient::HG005, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(Patient::HG005, Sequencer::Novaseq, Capture::Idt, 50, None),
+        to_run(Patient::HG005, Sequencer::Novaseq, Capture::Idt, 75, None),
         to_run(
             Patient::HG005,
             Sequencer::Novaseq,
@@ -383,6 +398,9 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
+        to_run(Patient::HG006, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(Patient::HG006, Sequencer::Novaseq, Capture::Idt, 50, None),
+        to_run(Patient::HG006, Sequencer::Novaseq, Capture::Idt, 75, None),
         to_run(
             Patient::HG006,
             Sequencer::Novaseq,
@@ -433,6 +451,9 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
+        to_run(Patient::HG007, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(Patient::HG007, Sequencer::Novaseq, Capture::Idt, 50, None),
+        to_run(Patient::HG007, Sequencer::Novaseq, Capture::Idt, 75, None),
         to_run(
             Patient::HG007,
             Sequencer::Novaseq,

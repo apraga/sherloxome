@@ -98,9 +98,7 @@ pub fn edit_bam(
     Ok(edited_bam)
 }
 
-fn backup_failures(
-    bam: &PathBuf,
-    outdir: &PathBuf) -> Result<(), Box<dyn Error>>{
+fn backup_failures(bam: &PathBuf, outdir: &PathBuf) -> Result<(), Box<dyn Error>> {
     let failed = outdir.join("varben").join("invalid_mutation.txt");
     let bam_stem = bam.file_stem().unwrap().to_string_lossy();
     let failed_ = outdir.join(format!("{bam_stem}_varben_failed.txt"));
