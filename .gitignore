@@ -43,3 +43,12 @@ output_tiddit
 *col6a1*.vcf*
 dbsnp*col6a1*
 tests/
+*.roc.all*
+*.roc.Locations*
+*.metrics.json.gz
+data/ref/HG*.vcf.gz*
+data/ref/HG*.bed
+data/exp_raw/dbsnp_*
+data/exp_pro/HG*.vcf.*
+data/exp_pro_old
+data/sdf
