@@ -65,7 +65,7 @@ jobs:
         run: |
           nix develop ./reproducible-sarek-germline --command \
             nextflow run nf-core/sarek -r 3.5.1 \
-              --input tests/samplesheet-hg002-col6a1.csv \
+              --input samplesheet-hg002-col6a1.csv \
               -c conf/test_chr21.conf \
               --outdir tests/test-col6a1
 
@@ -73,6 +73,7 @@ jobs:
         run: |
           nix shell .#default --command \
             ./target/release/sherloxome benchmark \
+              --config conf/config-giab-ci.toml \
               --input tests/test-col6a1/ \
               --output tests/test-col6a1/
 
@@ -80,10 +81,14 @@ jobs:
         run: |
           python3 - <<'EOF'
           import csv, sys
-          path = "tests/test-col6a1/HG002_hiseq4000_agilent-col6a1_50x.summary.csv"
+          # Read merged.csv rather than a raw hap.py summary CSV: the latter's filename is
+          # derived from the query VCF's own name (e.g. "*.haplotypecaller.summary.csv"),
+          # which depends on which sarek tools ran and shouldn't be hardcoded here.
+          path = "tests/test-col6a1/merged.csv"
           with open(path) as f:
               for row in csv.DictReader(f):
-                  if row["Type"] == "SNP" and row["Filter"] == "PASS":
+                  if row["prefix"].startswith("HG002_hiseq4000_agilent-col6a1_50x") and \
+                     row["Type"] == "SNP" and row["Filter"] == "PASS":
                       tp, total = int(row["TRUTH.TP"]), int(row["TRUTH.TOTAL"])
                       if total != 3 or tp != 3:
                           print(f"FAIL: expected 3/3 SNPs, got {tp}/{total}", file=sys.stderr)
@@ -131,7 +136,7 @@ jobs:
       - name: Run setup
         run: |
           nix shell .#default --command \
-            ./target/release/sherloxome setup --config tests/config-simuscop-ci.toml
+            ./target/release/sherloxome setup --config conf/config-simuscop-ci.toml
 
       - name: Run sarek pipeline
         run: |
@@ -145,7 +150,7 @@ jobs:
         run: |
           nix shell .#default --command \
             ./target/release/sherloxome benchmark \
-              --config tests/config-simuscop-ci.toml \
+              --config conf/config-simuscop-ci.toml \
               --input tests/test-simuscop/ \
               --output tests/test-simuscop/
 
@@ -153,10 +158,14 @@ jobs:
         run: |
           python3 - <<'EOF'
           import csv, sys
-          path = "tests/test-simuscop/nopatient_hiseq4000_agilent-col6a1_50x_simuscop.summary.csv"
+          # Read merged.csv rather than a raw hap.py summary CSV: the latter's filename is
+          # derived from the query VCF's own name (e.g. "*.haplotypecaller.summary.csv"),
+          # which depends on which sarek tools ran and shouldn't be hardcoded here.
+          path = "tests/test-simuscop/merged.csv"
           with open(path) as f:
               for row in csv.DictReader(f):
-                  if row["Type"] == "SNP" and row["Filter"] == "PASS":
+                  if row["prefix"].startswith("nopatient_hiseq4000_agilent-col6a1_50x_simuscop") and \
+                     row["Type"] == "SNP" and row["Filter"] == "PASS":
                       recall = float(row["METRIC.Recall"])
                       tp, total = int(row["TRUTH.TP"]), int(row["TRUTH.TOTAL"])
                       if total == 0 or recall < 1.0:
@@ -219,7 +228,7 @@ jobs:
       - name: Run setup
         run: |
           nix shell .#default --command \
-            ./target/release/sherloxome setup --config tests/config-varben-ci.toml
+            ./target/release/sherloxome setup --config conf/config-varben-ci.toml
 
       - name: Run sarek pipeline
         run: |
@@ -233,7 +242,7 @@ jobs:
         run: |
           nix shell .#default --command \
             ./target/release/sherloxome benchmark \
-              --config tests/config-varben-ci.toml \
+              --config conf/config-varben-ci.toml \
               --input tests/test-varben/ \
               --output tests/test-varben/
 
@@ -241,10 +250,14 @@ jobs:
         run: |
           python3 - <<'EOF'
           import csv, sys
-          path = "tests/test-varben/HG002_hiseq4000_agilent-col6a1_50x_varben.summary.csv"
+          # Read merged.csv rather than a raw hap.py summary CSV: the latter's filename is
+          # derived from the query VCF's own name (e.g. "*.haplotypecaller.summary.csv"),
+          # which depends on which sarek tools ran and shouldn't be hardcoded here.
+          path = "tests/test-varben/merged.csv"
           with open(path) as f:
               for row in csv.DictReader(f):
-                  if row["Type"] == "SNP" and row["Filter"] == "PASS":
+                  if row["prefix"].startswith("HG002_hiseq4000_agilent-col6a1_50x_varben") and \
+                     row["Type"] == "SNP" and row["Filter"] == "PASS":
                       recall = float(row["METRIC.Recall"])
                       tp, total = int(row["TRUTH.TP"]), int(row["TRUTH.TOTAL"])
                       if total == 0 or recall < 1.0:
