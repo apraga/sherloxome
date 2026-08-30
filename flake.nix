@@ -16,6 +16,7 @@
             deps = {
                 varben = pkgs.callPackage pkgs/varben/package.nix {};
                 simuscop = pkgs.callPackage pkgs/simuscop/package.nix {};
+                neat = pkgs.callPackage pkgs/neat/package.nix {};
                 bwa = pkgs.bwa;
                 bcftools=  pkgs.bcftools;
                 htslib = pkgs.htslib; # provides tabix
