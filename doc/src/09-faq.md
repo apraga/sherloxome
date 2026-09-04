@@ -6,7 +6,7 @@ vcfeval has an undocumented thread limit. Sherloxome forces `--threads 1` for ea
 
 In a SLURM job the `SLURM_CPUS_PER_TASK` variable can cause hap.py to request more threads than vcfeval allows. Using sherloxome's `analyze` command avoids this.
 
-## Only some of my requested runs appear in samplesheet.csv
+## Only some of my requested runs appear in the generated samplesheets
 
 Not all (patient × sequencer × capture × depth) combinations are available in the BAID2020 dataset. Sherloxome prints a summary of requested vs. available runs during `setup`. See [available combinations](04-misc.md) for the full list.
 

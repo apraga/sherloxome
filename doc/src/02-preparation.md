@@ -8,15 +8,21 @@ Then run the CLI with `setup`. We suggest using nix:
 nix shell .#default --command cargo run --release -- setup
 ```
 
-This command writes `samplesheet.csv` for the variant calling pipeline
+This command writes one `samplesheet-{capture}.csv` per capture kit for the variant calling pipeline. Splitting by capture kit is necessary because a single sarek run only accepts one `--intervals` BED, so rows using different capture kits cannot share a samplesheet.
 
 ## Detailed example
 
-Here's an example combining 1 real patient and 2 insilico configurations. The samplesheet generated will look like:
+Here's an example combining 1 real patient (capture `agilent`) and 2 insilico configurations (capture `agilent-col6a1`). Two files are generated:
 
+`samplesheet-agilent.csv`:
 ```csv
 patient,sample,lane,fastq_1,fastq_2
 HG002,HG002_hiseq4000_agilent_50x,1,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes_agilent.50x.R1.fastq.gz,https://storage.googleapis.com/brain-genomics-public/research/sequencing/fastq/hiseq4000/wes_agilent/50x/HG002.hiseq4000.wes_agilent.50x.R2.fastq.gz
+```
+
+`samplesheet-agilent-col6a1.csv`:
+```csv
+patient,sample,lane,fastq_1,fastq_2
 silico-varben,HG002_hiseq4000_agilent-col6a1_50x_varben_varben,1,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben_1.fq.gz,data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_varben_2.fq.gz
 silico-simuscop,nopatient_hiseq4000_agilent-col6a1_50x_simuscop_simuscop,1,data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop_1.fq.gz,data/exp_raw/nopatient_hiseq4000_agilent-col6a1_50x_simuscop_2.fq.gz
 ```

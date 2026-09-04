@@ -76,18 +76,30 @@ pub struct SamplesheetRow {
     pub lane: u8,
     pub fastq_1: String,
     pub fastq_2: String,
+    /// Capture kit this row belongs to (key into `Config::capture`). Sarek only accepts a
+    /// single `--intervals` BED per run, so rows must be split one samplesheet per capture
+    /// kit rather than mixed together.
+    pub capture: String,
 }
 
-/// Write all rows to `samplesheet.csv` in the current directory.
+/// Write one `samplesheet-{capture}.csv` per capture kit found in `rows`, in the current
+/// directory. Splitting by capture kit is required because a single sarek run only accepts
+/// one `--intervals` BED, so samples using different capture kits cannot share a run.
 fn write_samplesheet(rows: Vec<SamplesheetRow>) -> Result<(), Box<dyn Error>> {
-    let mut file = File::create("samplesheet.csv")?;
-    writeln!(file, "patient,sample,lane,fastq_1,fastq_2")?;
+    let mut by_capture: HashMap<String, Vec<SamplesheetRow>> = HashMap::new();
     for r in rows {
-        writeln!(
-            file,
-            "{},{},{},{},{}",
-            r.patient, r.sample, r.lane, r.fastq_1, r.fastq_2
-        )?;
+        by_capture.entry(r.capture.clone()).or_default().push(r);
+    }
+    for (capture, rows) in by_capture {
+        let mut file = File::create(format!("samplesheet-{capture}.csv"))?;
+        writeln!(file, "patient,sample,lane,fastq_1,fastq_2")?;
+        for r in rows {
+            writeln!(
+                file,
+                "{},{},{},{},{}",
+                r.patient, r.sample, r.lane, r.fastq_1, r.fastq_2
+            )?;
+        }
     }
     Ok(())
 }
@@ -159,7 +171,7 @@ fn download_giab_runs(runs: &HashSet<Run>) {
 /// Main entry point for the `setup` subcommand.
 ///
 /// Depending on what is present in `conf`, downloads GIAB data and/or generates
-/// in silico controls, then writes `samplesheet.csv`.
+/// in silico controls, then writes one `samplesheet-{capture}.csv` per capture kit.
 pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
     let mut rows: Vec<SamplesheetRow> = Vec::new();
     if conf.real.is_none() && conf.silico.is_none() {
@@ -189,7 +201,7 @@ pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
 }
 
 /// Build a samplesheet row for an in silico sample.
-pub fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetRow {
+pub fn silico_row(silico_type: &str, capture: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetRow {
     let fq1_str = fq1
         .clone()
         .into_os_string()
@@ -213,6 +225,7 @@ pub fn silico_row(silico_type: &str, fq1: PathBuf, fq2: PathBuf) -> SamplesheetR
         sample: sample,
         fastq_1: fq1_str,
         fastq_2: fq2_str,
+        capture: capture.to_string(),
     };
 }
 
@@ -258,6 +271,46 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         }
+    }
+
+    fn row(capture: &str, sample: &str) -> SamplesheetRow {
+        SamplesheetRow {
+            patient: sample.to_string(),
+            sample: sample.to_string(),
+            lane: 1,
+            fastq_1: format!("{sample}_1.fq.gz"),
+            fastq_2: format!("{sample}_2.fq.gz"),
+            capture: capture.to_string(),
+        }
+    }
+
+    /// `write_samplesheet` writes to the current directory, so this test moves into a
+    /// dedicated temp dir. Cargo runs unit tests in parallel within the same process, but
+    /// no other test in this crate touches the current directory, so this is safe in practice.
+    #[test]
+    fn write_samplesheet_splits_by_capture() {
+        let dir = std::env::temp_dir().join("write_samplesheet_splits_by_capture");
+        std::fs::create_dir_all(&dir).unwrap();
+        let original = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+
+        let result = write_samplesheet(vec![
+            row("agilent", "HG002_novaseq_agilent_50x"),
+            row("idt", "HG002_novaseq_idt_50x"),
+            row("agilent", "HG003_novaseq_agilent_50x"),
+        ]);
+
+        let agilent = std::fs::read_to_string("samplesheet-agilent.csv");
+        let idt = std::fs::read_to_string("samplesheet-idt.csv");
+        std::env::set_current_dir(original).unwrap();
+
+        assert!(result.is_ok());
+        let agilent = agilent.expect("missing samplesheet-agilent.csv");
+        assert!(agilent.contains("HG002_novaseq_agilent_50x"));
+        assert!(agilent.contains("HG003_novaseq_agilent_50x"));
+        assert!(!agilent.contains("idt"));
+        let idt = idt.expect("missing samplesheet-idt.csv");
+        assert!(idt.contains("HG002_novaseq_idt_50x"));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # Run the variant calling pipeline
 
-After `sherloxome setup` writes `samplesheet.csv`, run a variant calling pipeline on the data.
+After `sherloxome setup` writes one `samplesheet-{capture}.csv` per capture kit, run a variant calling pipeline on the data.
 
 ## nf-core/sarek
 
@@ -8,23 +8,26 @@ Sherloxome generates samplesheets compatible with [nf-core/sarek](https://nf-co.
 
 ### Samplesheet format
 
+`setup` groups rows by capture kit and writes a separate file for each, e.g. `samplesheet-agilent.csv`:
+
 ```csv
 patient,sample,lane,fastq_1,fastq_2
 HG001,HG001_hiseq4000_agilent_50x,1,https://...R1.fastq.gz,https://...R2.fastq.gz
-HG002,HG002_novaseq_idt_75x,1,https://...R1.fastq.gz,https://...R2.fastq.gz
+HG002,HG002_novaseq_agilent_75x,1,https://...R1.fastq.gz,https://...R2.fastq.gz
 silico-varben,HG002_nohardclip,1,/path/to/HG002_nohardclip_1.fq.gz,/path/to/HG002_nohardclip_2.fq.gz
 ```
 
 - Real patient rows contain GCS FASTQ URLs; Nextflow downloads them at runtime.
 - In silico rows contain local FASTQ paths produced by `sherloxome setup`.
+- Splitting by capture kit is required because a single sarek run only accepts one `--intervals` BED, so samples using different capture kits cannot share a run.
 
 ### Example sarek command
 
-Run sarek once per capture kit, adjusting `--intervals`:
+Run sarek once per capture kit, using the matching samplesheet and `--intervals`:
 
 ```bash
 nextflow run nf-core/sarek \
-    --input samplesheet.csv \
+    --input samplesheet-agilent.csv \
     -r 3.5.1 \
     --outdir data/exp_raw/giab \
     --tools haplotypecaller \
@@ -70,7 +73,7 @@ Example: `HG002_novaseq_agilent_75x.vcf.gz`
 #SBATCH --mem=32G
 
 nextflow run nf-core/sarek \
-    --input samplesheet.csv \
+    --input samplesheet-agilent.csv \
     -r 3.5.1 \
     --outdir data/exp_raw/giab \
     --tools haplotypecaller \

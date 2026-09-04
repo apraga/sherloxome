@@ -133,7 +133,7 @@ fn generate_controls_varben(
             varben.mindepth,
             outdir,
         )?;
-        rows.push(silico_row("varben", fq1, fq2));
+        rows.push(silico_row("varben", capture, fq1, fq2));
         Ok(())
     } else {
         log::error!("[silico.varben] requires a BAM file");
@@ -179,7 +179,7 @@ fn generate_controls_simuscop(
         coverage,
         snp_path,
     )?;
-    rows.push(silico_row("simuscop", fq1, fq2));
+    rows.push(silico_row("simuscop", capture, fq1, fq2));
     Ok(())
 }
 

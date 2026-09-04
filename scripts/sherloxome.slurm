@@ -18,7 +18,7 @@
 export NXF_HOME=/Work/Users/apraga/.nextflow
 
 # user.name must be forced (again... our fix does not seem to work in nix)
-nextflow run nf-core/sarek --input samplesheet.csv  -r 3.5.1 --outdir giab -c conf/slurm.config \
+nextflow run nf-core/sarek --input samplesheet-idt.csv  -r 3.5.1 --outdir giab -c conf/slurm.config \
 	--tools haplotypecaller --skip_tools haplotypecaller_filter	 \
 	--wes --intervals ./capture/xgen-exome-hyb-panel-v2-targets-hg38.bed -bg \
 	-resume	grave_spence

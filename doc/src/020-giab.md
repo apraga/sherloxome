@@ -46,5 +46,5 @@ For each patient, files are saved to `data/ref/`:
 
 > HG002–HG004 use a `_noinconsistent` BED that excludes regions with inconsistent calls across family members.
 
-FASTQ files are **not** downloaded. For real patients, `samplesheet.csv` contains Google Cloud Storage URLs; Nextflow downloads them during the pipeline run.
+FASTQ files are **not** downloaded. For real patients, the generated `samplesheet-{capture}.csv` files contain Google Cloud Storage URLs; Nextflow downloads them during the pipeline run.
 

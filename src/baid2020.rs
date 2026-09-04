@@ -485,6 +485,7 @@ pub fn real_row(run: &Run) -> SamplesheetRow {
         lane: 1,
         fastq_1: url(run, "R1"),
         fastq_2: url(run, "R2"),
+        capture: run.capture.clone(),
     };
 }
 
