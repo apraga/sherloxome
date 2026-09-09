@@ -3,8 +3,8 @@
 //! Reads the `merged.csv` produced by [`crate::benchmark`] and opens a browser window
 //! showing F1-score distributions broken down by patient, sequencer, depth, and capture kit.
 
-// Column indices in merged.csv:
-// 0=Type, 1=Filter, 13=METRIC.F1_Score, 18=patient, 19=capture, 20=sequencer, 21=depth
+// Column indices are harcoded to match merged.csv:
+// 0=Type, 1=Filter, 13=METRIC.F1_Score, 19=patient, 20=capture, 21=sequencer, 22=depth
 
 use std::path::PathBuf;
 use vega_lite_4::*;
@@ -14,12 +14,6 @@ fn make_row(
     factor_idx: &str,
     show_column_labels: bool,
 ) -> Result<NormalizedSpec, Box<dyn std::error::Error>> {
-    // let sort = if factor_idx == "21" {
-    //     serde_json::from_value(serde_json::json!(["50x", "75x", "100x"]))?
-    // } else {
-    //     serde_json::from_value(serde_json::json!("ascending"))?
-    // };
-
     Ok(NormalizedSpecBuilder::default()
         .mark(Mark::Boxplot)
         .encoding(
@@ -77,10 +71,10 @@ pub fn plot(input: PathBuf, _output: PathBuf) -> Result<(), Box<dyn std::error::
                 .build()?,
         ])
         .vconcat(vec![
-            make_row("18", true)?,  // patient
-            make_row("20", false)?, // sequencer
-            make_row("21", false)?, // depth
-            make_row("19", false)?, // capture
+            make_row("19", true)?,  // patient
+            make_row("20", false)?, // capture
+            make_row("21", false)?, // sequencer
+            make_row("22", false)?, // depth
         ])
         .spacing(Spacing::Double(30.0))
         .config(
