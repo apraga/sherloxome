@@ -29,9 +29,8 @@ nb_variants = 2
 # Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent-col6a1"
 # capture = "agilent"
-# A BAM file is always required for varben as it will will modify it
-# Simuscop will define a sequencing profile from it if it does not exist.
-# Can be a URL or a local path.
+# Source BAM for simuscop's seqToProfile step (used to build a profile if none is pre-built).
+# Not used by varben (see [silico.varben] bam_files below). Must already exist locally.
 bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip.bam"
 # bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
 
@@ -48,6 +47,8 @@ coverage = 50
 
 # This section enables varben BAM editing (remove section to disable)
 # [silico.varben]
+# One entry per patient/sequencer/depth combination, all for the "agilent-col6a1" capture above
+# bam_files = ["data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"]
 # mindepth = 30
 
 # Define here the name of alls captures and the bed file

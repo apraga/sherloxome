@@ -247,7 +247,6 @@ mod tests {
     fn make_silico(capture: &str) -> SilicoConfig {
         SilicoConfig {
             capture: capture.to_string(),
-            bam_file: None,
             clinvar: None,
             nb_variants: None,
             outdir: None,
@@ -357,5 +356,23 @@ mod tests {
             &[("agilent-col6a1", "col6a1.bed")],
         );
         assert!(conf.validate().is_ok());
+    }
+
+    /// Regression test for config/schema drift: every shipped config.toml must still parse
+    /// against `Config` and pass validation. Catches breakage like a renamed field (e.g.
+    /// `[silico.varben] bam_file` -> `bam_files`) that a doc-only fix would miss, since these
+    /// run in CI unit tests on every push, not just in the (slower, less frequent) pipeline CI.
+    #[test]
+    fn shipped_configs_parse_and_validate() {
+        for path in [
+            "config.toml",
+            "conf/config-giab-ci.toml",
+            "conf/config-simuscop-ci.toml",
+            "conf/config-varben-ci.toml",
+        ] {
+            let content = std::fs::read_to_string(path).expect(path);
+            let conf: Config = toml::from_str(&content).expect(path);
+            conf.validate().expect(path);
+        }
     }
 }

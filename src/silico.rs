@@ -1,11 +1,12 @@
 //! # Insilico Controls
 //! Generate control variants by sampling clinvar data
+use crate::check_deps;
 use crate::dbsnp;
 use crate::download_blocking;
+use crate::run::run_from_filename;
 use crate::setup::{SamplesheetRow, silico_row};
 use crate::simuscop;
 use crate::varben;
-use crate::{check_deps, resolve_bam};
 use log;
 use noodles::bed;
 use noodles::bgzf;
@@ -33,6 +34,8 @@ use std::thread;
 pub struct SilicoSimuscopConfig {
     /// Path to a pre-built seqToProfile profile directory. Mutually exclusive with `vcf`.
     pub profile: Option<PathBuf>,
+    /// BAM file required when `profile` is absent; seqToProfile is run to build the profile.
+    pub bam: Option<PathBuf>,
     /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
     /// Required when `profile` is absent; seqToProfile is run to build the profile.
     pub vcf: Option<PathBuf>,
@@ -46,6 +49,11 @@ pub struct SilicoSimuscopConfig {
 /// [silico.varben] — presence enables varben BAM editing
 #[derive(Deserialize, Debug)]
 pub struct SilicoVarbenConfig {
+    /// BAM files to edit, one per patient/sequencer/depth combination to cover. Each must
+    /// already exist locally (no URL support — the filename itself is how the run's
+    /// patient/sequencer/depth are recovered, via the SAMPLE_SEQUENCER_CAPTURE_DEPTHx
+    /// filenaming scheme) and parse to the same capture kit as [silico] `capture`.
+    pub bam_files: Vec<PathBuf>,
     /// Minimum read depth required to edit a position (--mindepth)
     pub mindepth: Option<u32>,
 }
@@ -53,8 +61,6 @@ pub struct SilicoVarbenConfig {
 #[derive(Deserialize, Debug)]
 pub struct SilicoConfig {
     pub capture: String,
-    /// A BAM file is required for varben but not nor simuscop
-    pub bam_file: Option<String>,
     /// Local ClinVar VCF path; if absent the file is downloaded from NCBI.
     pub clinvar: Option<PathBuf>,
     /// Number of clinvar variants to sample to insert in the BAM
@@ -101,7 +107,7 @@ pub fn generate_controls(
     )?;
     if let Some(varben) = &silico.varben {
         generate_controls_varben(
-            &silico, capture, &fasta, &variants, &header, &outdir, varben, &mut rows,
+            capture, &fasta, &variants, &header, &outdir, varben, &mut rows,
         )?;
     }
     if let Some(simuscop) = &silico.simuscop {
@@ -113,7 +119,6 @@ pub fn generate_controls(
 }
 
 fn generate_controls_varben(
-    silico: &SilicoConfig,
     capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
@@ -122,8 +127,29 @@ fn generate_controls_varben(
     varben: &SilicoVarbenConfig,
     rows: &mut Vec<SamplesheetRow>,
 ) -> Result<(), Box<dyn Error>> {
-    if let Some(bam_file) = &silico.bam_file {
-        let bam_path = resolve_bam(bam_file, &outdir)?;
+    if varben.bam_files.is_empty() {
+        log::error!("[silico.varben] requires at least one entry in bam_files");
+        return Err("[silico.varben] requires at least one entry in bam_files".into());
+    }
+    for bam_path in &varben.bam_files {
+        if !bam_path.exists() {
+            return Err(format!("BAM file not found: {}", bam_path.display()).into());
+        }
+
+        let run = run_from_filename(&bam_path).ok_or_else(|| {
+            format!(
+                "BAM file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx filenaming scheme",
+                bam_path
+            )
+        })?;
+        if run.capture != capture {
+            return Err(format!(
+                "BAM {:?} is for capture '{}' but [silico] capture is '{}': list only BAMs for \
+                 this capture kit here, and run `setup` once per kit to cover several",
+                bam_path, run.capture, capture
+            )
+            .into());
+        }
         let (fq1, fq2) = varben::generate_controls_bam(
             &bam_path,
             capture,
@@ -134,11 +160,8 @@ fn generate_controls_varben(
             outdir,
         )?;
         rows.push(silico_row("varben", capture, fq1, fq2));
-        Ok(())
-    } else {
-        log::error!("[silico.varben] requires a BAM file");
-        return Err("[silico.varben] requires a BAM file".into());
     }
+    Ok(())
 }
 
 fn generate_controls_simuscop(
@@ -167,7 +190,7 @@ fn generate_controls_simuscop(
     dbsnp::write_snp_input(&dbsnp_vcf, &snp_path)?;
 
     let (fq1, fq2) = simuscop::generate_controls_fastq(
-        &silico.bam_file,
+        &simuscop.bam,
         &bed,
         // &capture,
         &fasta,

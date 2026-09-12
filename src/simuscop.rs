@@ -1,4 +1,3 @@
-use crate::resolve_bam;
 use crate::run::{run_from_filename, run_to_string};
 use crate::silico::{index_vcf, nb_threads, sort_by_chromosome};
 use flate2::Compression;
@@ -127,7 +126,7 @@ pub fn write_config(
 /// Generate controls into a in-silico FASTQ.
 /// Either `profile` (pre-built directory) or `vcf` (runs seqToProfile) must be provided.
 pub fn generate_controls_fastq(
-    bam: &Option<String>,
+    bam: &Option<PathBuf>,
     bed: &PathBuf,
     // capture: &str,
     fasta: &PathBuf,
@@ -142,8 +141,10 @@ pub fn generate_controls_fastq(
     let profile_dir = if let Some(p) = profile {
         p.clone()
     } else if let Some(v) = vcf {
-        if let Some(bam_file) = bam {
-            let bam_path = resolve_bam(bam_file, outdir)?;
+        if let Some(bam_path) = bam {
+            if !bam_path.exists() {
+                return Err(format!("BAM file not found: {}", bam_path.display()).into());
+            }
             generate_profile(&bam_path, v, fasta, bed, outdir)?
         } else {
             log::error!("[silico.simuscop] requires a BAM file if no profile is set");

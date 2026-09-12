@@ -90,19 +90,6 @@ fn download_fasta(outdir: PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     Ok(fasta_path)
 }
 
-/// Download a bam file if it's an url, otherwise check the file exist
-pub fn resolve_bam(bam: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
-    if bam.starts_with("http://") || bam.starts_with("https://") {
-        download_file(bam, outdir)
-    } else {
-        let path = PathBuf::from(bam);
-        if !path.exists() {
-            return Err(format!("BAM file not found: {}", path.display()).into());
-        }
-        Ok(path)
-    }
-}
-
 fn download_file(url: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let parsed = Url::parse(&url)?;
     log::info!("Downloading file {}", url);

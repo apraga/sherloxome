@@ -29,14 +29,14 @@ nb_variants = 2
  fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
 ```
 
-and a BAM file for varben is also needd in the common section as it can be used by simuscop or varben, but for different purposes.
-
 ```toml
  Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent"
- A BAM file is always required for varben as it will will modify it
- Simuscop will define a sequencing profile from it if it does not exist.
- Can be a URL or a local path.
+ Source BAM for simuscop's seqToProfile step (used to build a profile if none is pre-built).
+ Not used by varben. Must already exist locally.
 bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
 ```
+
+Varben has its own list of BAMs to edit, in `[silico.varben] bam_files` — see
+[Varben](0210-varben.md).
 

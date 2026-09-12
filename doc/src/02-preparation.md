@@ -47,8 +47,6 @@ clinvar = "data/exp_raw/clinvar.vcf.gz"
 nb_variants = 1000
 # Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent"
-# A BAM file is always required for varben as it will will modify it
-bam_file = "data/exp_raw/HG002_hiseq4000_agilent_50x.bam"
 
 # This section enables simuscop FASTQ generation
 [silico.simuscop]
@@ -59,6 +57,8 @@ coverage = 50
 
 # This section enables varben BAM editing
 [silico.varben]
+# One BAM per patient/sequencer/depth combination, all for the "agilent" capture above
+bam_files = ["data/exp_raw/HG002_hiseq4000_agilent_50x.bam"]
 mindepth = 50
 
 # Define here the name of alls captures and the bed file
