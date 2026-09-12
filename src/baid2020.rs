@@ -105,6 +105,14 @@ pub fn available() -> HashSet<Run> {
             None,
         ),
         to_run(Patient::HG001, Sequencer::Hiseq4000, Capture::Idt, 50, None),
+        to_run(Patient::HG001, Sequencer::Hiseq4000, Capture::Idt, 75, None),
+        to_run(
+            Patient::HG001,
+            Sequencer::Hiseq4000,
+            Capture::Idt,
+            100,
+            None,
+        ),
         to_run(
             Patient::HG001,
             Sequencer::Hiseq4000,
@@ -114,28 +122,35 @@ pub fn available() -> HashSet<Run> {
         ),
         to_run(
             Patient::HG001,
+            Sequencer::Hiseq4000,
+            Capture::Truseq,
+            75,
+            None,
+        ),
+        to_run(
+            Patient::HG001,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            50,
+            None,
+        ),
+        to_run(
+            Patient::HG001,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            75,
+            None,
+        ),
+        to_run(
+            Patient::HG001,
             Sequencer::Novaseq,
             Capture::Agilent,
             100,
             None,
         ),
-        to_run(
-            Patient::HG001,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            50,
-            None,
-        ),
-        to_run(
-            Patient::HG001,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            75,
-            None,
-        ),
-        to_run(Patient::HG001, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(Patient::HG001, Sequencer::Novaseq, Capture::Idt, 50, None),
         to_run(Patient::HG001, Sequencer::Novaseq, Capture::Idt, 75, None),
+        to_run(Patient::HG001, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(
             Patient::HG001,
             Sequencer::Novaseq,
@@ -148,6 +163,13 @@ pub fn available() -> HashSet<Run> {
             Sequencer::Novaseq,
             Capture::Truseq,
             75,
+            None,
+        ),
+        to_run(
+            Patient::HG001,
+            Sequencer::Novaseq,
+            Capture::Truseq,
+            100,
             None,
         ),
         to_run(
@@ -158,6 +180,14 @@ pub fn available() -> HashSet<Run> {
             None,
         ),
         to_run(Patient::HG002, Sequencer::Hiseq4000, Capture::Idt, 50, None),
+        to_run(Patient::HG002, Sequencer::Hiseq4000, Capture::Idt, 75, None),
+        to_run(
+            Patient::HG002,
+            Sequencer::Hiseq4000,
+            Capture::Idt,
+            100,
+            None,
+        ),
         to_run(
             Patient::HG002,
             Sequencer::Hiseq4000,
@@ -167,28 +197,35 @@ pub fn available() -> HashSet<Run> {
         ),
         to_run(
             Patient::HG002,
+            Sequencer::Hiseq4000,
+            Capture::Truseq,
+            75,
+            None,
+        ),
+        to_run(
+            Patient::HG002,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            50,
+            None,
+        ),
+        to_run(
+            Patient::HG002,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            75,
+            None,
+        ),
+        to_run(
+            Patient::HG002,
             Sequencer::Novaseq,
             Capture::Agilent,
             100,
             None,
         ),
-        to_run(
-            Patient::HG002,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            50,
-            None,
-        ),
-        to_run(
-            Patient::HG002,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            75,
-            None,
-        ),
-        to_run(Patient::HG002, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(Patient::HG002, Sequencer::Novaseq, Capture::Idt, 50, None),
         to_run(Patient::HG002, Sequencer::Novaseq, Capture::Idt, 75, None),
+        to_run(Patient::HG002, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(
             Patient::HG002,
             Sequencer::Novaseq,
@@ -201,6 +238,13 @@ pub fn available() -> HashSet<Run> {
             Sequencer::Novaseq,
             Capture::Truseq,
             75,
+            None,
+        ),
+        to_run(
+            Patient::HG002,
+            Sequencer::Novaseq,
+            Capture::Truseq,
+            100,
             None,
         ),
         to_run(
@@ -211,18 +255,12 @@ pub fn available() -> HashSet<Run> {
             None,
         ),
         to_run(Patient::HG003, Sequencer::Hiseq4000, Capture::Idt, 50, None),
+        to_run(Patient::HG003, Sequencer::Hiseq4000, Capture::Idt, 75, None),
         to_run(
             Patient::HG003,
             Sequencer::Hiseq4000,
             Capture::Truseq,
             50,
-            None,
-        ),
-        to_run(
-            Patient::HG003,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            100,
             None,
         ),
         to_run(
@@ -239,9 +277,16 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
-        to_run(Patient::HG003, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(
+            Patient::HG003,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            100,
+            None,
+        ),
         to_run(Patient::HG003, Sequencer::Novaseq, Capture::Idt, 50, None),
         to_run(Patient::HG003, Sequencer::Novaseq, Capture::Idt, 75, None),
+        to_run(Patient::HG003, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(
             Patient::HG003,
             Sequencer::Novaseq,
@@ -264,18 +309,19 @@ pub fn available() -> HashSet<Run> {
             None,
         ),
         to_run(Patient::HG004, Sequencer::Hiseq4000, Capture::Idt, 50, None),
+        to_run(Patient::HG004, Sequencer::Hiseq4000, Capture::Idt, 75, None),
+        to_run(
+            Patient::HG004,
+            Sequencer::Hiseq4000,
+            Capture::Idt,
+            100,
+            None,
+        ),
         to_run(
             Patient::HG004,
             Sequencer::Hiseq4000,
             Capture::Truseq,
             50,
-            None,
-        ),
-        to_run(
-            Patient::HG004,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            100,
             None,
         ),
         to_run(
@@ -292,9 +338,16 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
-        to_run(Patient::HG004, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(
+            Patient::HG004,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            100,
+            None,
+        ),
         to_run(Patient::HG004, Sequencer::Novaseq, Capture::Idt, 50, None),
         to_run(Patient::HG004, Sequencer::Novaseq, Capture::Idt, 75, None),
+        to_run(Patient::HG004, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(
             Patient::HG004,
             Sequencer::Novaseq,
@@ -317,18 +370,19 @@ pub fn available() -> HashSet<Run> {
             None,
         ),
         to_run(Patient::HG005, Sequencer::Hiseq4000, Capture::Idt, 50, None),
+        to_run(Patient::HG005, Sequencer::Hiseq4000, Capture::Idt, 75, None),
+        to_run(
+            Patient::HG005,
+            Sequencer::Hiseq4000,
+            Capture::Idt,
+            100,
+            None,
+        ),
         to_run(
             Patient::HG005,
             Sequencer::Hiseq4000,
             Capture::Truseq,
             50,
-            None,
-        ),
-        to_run(
-            Patient::HG005,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            100,
             None,
         ),
         to_run(
@@ -345,9 +399,16 @@ pub fn available() -> HashSet<Run> {
             75,
             None,
         ),
-        to_run(Patient::HG005, Sequencer::Novaseq, Capture::Idt, 100, None),
+        to_run(
+            Patient::HG005,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            100,
+            None,
+        ),
         to_run(Patient::HG005, Sequencer::Novaseq, Capture::Idt, 50, None),
         to_run(Patient::HG005, Sequencer::Novaseq, Capture::Idt, 75, None),
+        to_run(Patient::HG005, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(
             Patient::HG005,
             Sequencer::Novaseq,
@@ -370,6 +431,14 @@ pub fn available() -> HashSet<Run> {
             None,
         ),
         to_run(Patient::HG006, Sequencer::Hiseq4000, Capture::Idt, 50, None),
+        to_run(Patient::HG006, Sequencer::Hiseq4000, Capture::Idt, 75, None),
+        to_run(
+            Patient::HG006,
+            Sequencer::Hiseq4000,
+            Capture::Idt,
+            100,
+            None,
+        ),
         to_run(
             Patient::HG006,
             Sequencer::Hiseq4000,
@@ -379,28 +448,35 @@ pub fn available() -> HashSet<Run> {
         ),
         to_run(
             Patient::HG006,
+            Sequencer::Hiseq4000,
+            Capture::Truseq,
+            75,
+            None,
+        ),
+        to_run(
+            Patient::HG006,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            50,
+            None,
+        ),
+        to_run(
+            Patient::HG006,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            75,
+            None,
+        ),
+        to_run(
+            Patient::HG006,
             Sequencer::Novaseq,
             Capture::Agilent,
             100,
             None,
         ),
-        to_run(
-            Patient::HG006,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            50,
-            None,
-        ),
-        to_run(
-            Patient::HG006,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            75,
-            None,
-        ),
-        to_run(Patient::HG006, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(Patient::HG006, Sequencer::Novaseq, Capture::Idt, 50, None),
         to_run(Patient::HG006, Sequencer::Novaseq, Capture::Idt, 75, None),
+        to_run(Patient::HG006, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(
             Patient::HG006,
             Sequencer::Novaseq,
@@ -413,6 +489,13 @@ pub fn available() -> HashSet<Run> {
             Sequencer::Novaseq,
             Capture::Truseq,
             75,
+            None,
+        ),
+        to_run(
+            Patient::HG006,
+            Sequencer::Novaseq,
+            Capture::Truseq,
+            100,
             None,
         ),
         to_run(
@@ -423,6 +506,7 @@ pub fn available() -> HashSet<Run> {
             None,
         ),
         to_run(Patient::HG007, Sequencer::Hiseq4000, Capture::Idt, 50, None),
+        to_run(Patient::HG007, Sequencer::Hiseq4000, Capture::Idt, 75, None),
         to_run(
             Patient::HG007,
             Sequencer::Hiseq4000,
@@ -434,26 +518,26 @@ pub fn available() -> HashSet<Run> {
             Patient::HG007,
             Sequencer::Novaseq,
             Capture::Agilent,
+            50,
+            None,
+        ),
+        to_run(
+            Patient::HG007,
+            Sequencer::Novaseq,
+            Capture::Agilent,
+            75,
+            None,
+        ),
+        to_run(
+            Patient::HG007,
+            Sequencer::Novaseq,
+            Capture::Agilent,
             100,
             None,
         ),
-        to_run(
-            Patient::HG007,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            50,
-            None,
-        ),
-        to_run(
-            Patient::HG007,
-            Sequencer::Novaseq,
-            Capture::Agilent,
-            75,
-            None,
-        ),
-        to_run(Patient::HG007, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(Patient::HG007, Sequencer::Novaseq, Capture::Idt, 50, None),
         to_run(Patient::HG007, Sequencer::Novaseq, Capture::Idt, 75, None),
+        to_run(Patient::HG007, Sequencer::Novaseq, Capture::Idt, 100, None),
         to_run(
             Patient::HG007,
             Sequencer::Novaseq,
@@ -466,6 +550,13 @@ pub fn available() -> HashSet<Run> {
             Sequencer::Novaseq,
             Capture::Truseq,
             75,
+            None,
+        ),
+        to_run(
+            Patient::HG007,
+            Sequencer::Novaseq,
+            Capture::Truseq,
+            100,
             None,
         ),
     ];
@@ -511,4 +602,67 @@ pub fn all_captures() -> Vec<Capture> {
 /// All supported sequencer types.
 pub fn all_sequencers() -> Vec<Sequencer> {
     [Sequencer::Hiseq4000, Sequencer::Novaseq].to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression test for the hardcoded `available()` list, generated from an actual listing
+    /// of the Baid2020 GCS bucket (`gs://brain-genomics-public/research/sequencing/fastq/`):
+    ///
+    /// ```sh
+    /// curl -s "https://www.googleapis.com/storage/v1/b/brain-genomics-public/o?prefix=research/sequencing/fastq/&maxResults=1000&fields=items(name)" \
+    ///   | jq -r '.items[].name' | grep -e agilent -e idt -e truseq | grep HG00 | grep R1
+    /// ```
+    ///
+    /// 96 combinations actually exist there (7 patients x up to 2 sequencers x 3 kits x up to
+    /// 3 depths, minus per-patient gaps with no simple rule — hence still hardcoded rather
+    /// than a cartesian product). A prior version of this list only had 77, silently missing
+    /// 19 real combinations (mostly HiSeq4000 x IDT at 75x/100x).
+    #[test]
+    fn available_matches_bucket_listing() {
+        let runs = available();
+        assert_eq!(runs.len(), 96, "expected 96 available combinations");
+
+        // Spot-check combinations that were missing before this list was regenerated from the
+        // bucket listing.
+        for run in [
+            to_run(Patient::HG001, Sequencer::Hiseq4000, Capture::Idt, 75, None),
+            to_run(
+                Patient::HG001,
+                Sequencer::Hiseq4000,
+                Capture::Idt,
+                100,
+                None,
+            ),
+            to_run(
+                Patient::HG001,
+                Sequencer::Novaseq,
+                Capture::Truseq,
+                100,
+                None,
+            ),
+            to_run(Patient::HG007, Sequencer::Hiseq4000, Capture::Idt, 75, None),
+            to_run(
+                Patient::HG007,
+                Sequencer::Novaseq,
+                Capture::Truseq,
+                100,
+                None,
+            ),
+        ] {
+            assert!(runs.contains(&run), "missing {run:?}");
+        }
+
+        // A combination that genuinely doesn't exist in the bucket.
+        let absent = to_run(
+            Patient::HG001,
+            Sequencer::Hiseq4000,
+            Capture::Agilent,
+            75,
+            None,
+        );
+        assert!(!runs.contains(&absent), "unexpectedly present: {absent:?}");
+    }
 }

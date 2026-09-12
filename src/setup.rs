@@ -362,15 +362,23 @@ mod tests {
     /// against `Config` and pass validation. Catches breakage like a renamed field (e.g.
     /// `[silico.varben] bam_file` -> `bam_files`) that a doc-only fix would miss, since these
     /// run in CI unit tests on every push, not just in the (slower, less frequent) pipeline CI.
+    ///
+    /// Paths are resolved from `CARGO_MANIFEST_DIR` rather than the process's current
+    /// directory: `write_samplesheet_splits_by_capture` (like this test, run concurrently by
+    /// default) temporarily `set_current_dir`s away and back, which — being a process-wide,
+    /// not per-thread, piece of state — would otherwise make this test flaky depending on
+    /// scheduling.
     #[test]
     fn shipped_configs_parse_and_validate() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         for path in [
             "config.toml",
             "conf/config-giab-ci.toml",
             "conf/config-simuscop-ci.toml",
             "conf/config-varben-ci.toml",
         ] {
-            let content = std::fs::read_to_string(path).expect(path);
+            let full_path = root.join(path);
+            let content = std::fs::read_to_string(&full_path).expect(path);
             let conf: Config = toml::from_str(&content).expect(path);
             conf.validate().expect(path);
         }
