@@ -32,13 +32,10 @@ use std::thread;
 /// guide](https://apraga.github.io/sherloxome/022-dbsnp.html#configuration).
 #[derive(Deserialize, Debug)]
 pub struct SilicoSimuscopConfig {
-    /// Path to a pre-built seqToProfile profile directory. Mutually exclusive with `vcf`.
-    pub profile: Option<PathBuf>,
-    /// BAM file required when `profile` is absent; seqToProfile is run to build the profile.
-    pub bam: Option<PathBuf>,
-    /// VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
-    /// Required when `profile` is absent; seqToProfile is run to build the profile.
-    pub vcf: Option<PathBuf>,
+    /// Path to a pre-built seqToProfile profile directory. See the [GIAB
+    /// example](https://apraga.github.io/sherloxome/0211-simuscop.html#giab-example) for how to
+    /// obtain one.
+    pub profile: PathBuf,
     /// Target mean sequencing coverage over the capture region. simuscop's own `coverage`
     /// parameter behaves more like a peak/max than a realized mean (see
     /// `MEAN_COVERAGE_REALIZATION`), so this value is scaled up before being written to the
@@ -81,14 +78,7 @@ pub fn generate_controls(
     capture: &str,
     fasta: PathBuf,
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
-    check_deps(&[
-        "bwa",
-        "samtools",
-        "tabix",
-        "bcftools",
-        "muteditor",
-        "seqToProfile",
-    ]);
+    check_deps(&["bwa", "samtools", "tabix", "bcftools", "muteditor"]);
 
     let outdir = silico
         .outdir
@@ -190,12 +180,9 @@ fn generate_controls_simuscop(
     dbsnp::write_snp_input(&dbsnp_vcf, &snp_path)?;
 
     let (fq1, fq2) = simuscop::generate_controls_fastq(
-        &simuscop.bam,
         &bed,
-        // &capture,
         &fasta,
-        simuscop.vcf.as_ref(),
-        simuscop.profile.as_ref(),
+        &simuscop.profile,
         &variants,
         header,
         &outdir,

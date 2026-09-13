@@ -26,14 +26,9 @@ capture = "agilent"
 
 # This section enables simuscop FASTQ generation (remove section to disable)
 [silico.simuscop]
-# Pre-built seqToProfile profile directory. If set, seqToProfile is skipped.
+# Pre-built seqToProfile profile directory.
 # The profile must follow the filenaming scheme
 profile = "data/ref/hiseq4000_agilent_50x.profile"
-# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
-# Required when profile is absent; seqToProfile is run to build the profile.
-# bam_file = "data/exp_raw/HG002_hiseq4000_agilent_50x.bam"
-# Required when profile is absent; seqToProfile is run to build the profile.
-# vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
 # Sequencing coverage
 coverage = 50
 

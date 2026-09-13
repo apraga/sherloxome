@@ -29,19 +29,12 @@ nb_variants = 2
 # Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent-col6a1"
 # capture = "agilent"
-# Source BAM for simuscop's seqToProfile step (used to build a profile if none is pre-built).
-# Not used by varben (see [silico.varben] bam_files below). Must already exist locally.
-bam_file = "data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x_nohardclip.bam"
-# bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
 
 # This section enables simuscop FASTQ generation (remove section to disable)
 [silico.simuscop]
-# Pre-built seqToProfile profile directory. If set, seqToProfile is skipped.
-# The profile must follow the filenaming scheme
+# Pre-built seqToProfile profile directory. The profile must follow the filenaming scheme.
+# See the GIAB example for how to obtain one.
 profile = "data/ref/hiseq4000_agilent-col6a1_50x.profile"
-# VCF of germline variants called from bam_file (e.g. via GATK HaplotypeCaller).
-# Required when profile is absent; seqToProfile is run to build the profile.
-# vcf = "data/ref/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf"
 # Sequencing coverage
 coverage = 50
 

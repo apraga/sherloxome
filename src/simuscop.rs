@@ -123,37 +123,18 @@ pub fn write_config(
     Ok(())
 }
 
-/// Generate controls into a in-silico FASTQ.
-/// Either `profile` (pre-built directory) or `vcf` (runs seqToProfile) must be provided.
+/// Generate controls into a in-silico FASTQ from a pre-built seqToProfile `profile` directory.
 pub fn generate_controls_fastq(
-    bam: &Option<PathBuf>,
     bed: &PathBuf,
-    // capture: &str,
     fasta: &PathBuf,
-    vcf: Option<&PathBuf>,
-    profile: Option<&PathBuf>,
+    profile: &Path,
     variants: &Vec<RecordBuf>,
     header: &vcf::Header,
     outdir: &PathBuf,
     coverage: u32,
     snp_file: PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
-    let profile_dir = if let Some(p) = profile {
-        p.clone()
-    } else if let Some(v) = vcf {
-        if let Some(bam_path) = bam {
-            if !bam_path.exists() {
-                return Err(format!("BAM file not found: {}", bam_path.display()).into());
-            }
-            generate_profile(&bam_path, v, fasta, bed, outdir)?
-        } else {
-            log::error!("[silico.simuscop] requires a BAM file if no profile is set");
-            return Err("[silico.simuscop] requires a BAM file if no profile is set".into());
-        }
-    } else {
-        log::error!("[silico.simuscop] requires either `profile` or `vcf`");
-        return Err("[silico.simuscop] requires either `profile` or `vcf`".into());
-    };
+    let profile_dir = profile.to_path_buf();
 
     // Add a false patient id before extracting
     let profile_stem = profile_dir
@@ -246,47 +227,4 @@ fn compress_fastq(fq: &Path) -> Result<PathBuf, Box<dyn Error>> {
 
     std::fs::remove_file(fq)?;
     Ok(gz_path)
-}
-
-/// Build a seqToProfile sequencing profile from a normal BAM.
-/// The profile directory is derived from the BAM stem and reused on subsequent runs.
-fn generate_profile(
-    bam_path: &PathBuf,
-    vcf: &PathBuf,
-    fasta: &PathBuf,
-    bed: &PathBuf,
-    outdir: &PathBuf,
-) -> Result<PathBuf, Box<dyn Error>> {
-    let bam_stem = bam_path.file_stem().unwrap().to_string_lossy();
-    let profile_file = outdir.join(format!("{bam_stem}.profile"));
-
-    if profile_file.exists() {
-        log::debug!("Reusing existing profile: {:?}", profile_file);
-        return Ok(profile_file);
-    }
-    std::fs::create_dir_all(outdir)?;
-    log::info!("Generating sequencing profile with seqToProfile");
-    let args = [
-        "-b",
-        bam_path.to_str().ok_or("Invalid BAM path")?,
-        "-v",
-        vcf.to_str().ok_or("Invalid VCF path")?,
-        "-r",
-        fasta.to_str().ok_or("Invalid FASTA path")?,
-        "-t",
-        bed.to_str().ok_or("Invalid BED path")?,
-        "-o",
-        profile_file.to_str().ok_or("Invalid profile dir path")?,
-    ];
-    println!("{:?}", args);
-
-    let status = Command::new("seqToProfile").args(args).status()?;
-
-    if !status.success() {
-        // Remove the empty directory so the next run retries cleanly
-        let _ = std::fs::remove_dir(&profile_file);
-        return Err(format!("seqToProfile exited with status {status}").into());
-    }
-
-    Ok(profile_file)
 }

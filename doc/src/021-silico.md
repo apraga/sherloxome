@@ -32,11 +32,9 @@ nb_variants = 2
 ```toml
  Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent"
- Source BAM for simuscop's seqToProfile step (used to build a profile if none is pre-built).
- Not used by varben. Must already exist locally.
-bam_file = "data/exp_raw/HG002.hiseq4000.wes-agilent.50x.dedup.grch38_nohardclip.bam"
 ```
 
-Varben has its own list of BAMs to edit, in `[silico.varben] bam_files` — see
-[Varben](0210-varben.md).
+Simuscop needs a pre-built seqToProfile profile, in `[silico.simuscop] profile` — see
+[Silico FASTQ with simuscop](0211-simuscop.md). Varben has its own list of BAMs to edit, in
+`[silico.varben] bam_files` — see [Varben](0210-varben.md).
 
