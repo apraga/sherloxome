@@ -1,10 +1,12 @@
 //! Visualise benchmarking results as interactive Vega-Lite boxplots.
 //!
 //! Reads the `merged.csv` produced by [`crate::benchmark`] and opens a browser window
-//! showing F1-score distributions broken down by patient, sequencer, depth, and capture kit.
+//! showing F1-score distributions broken down by patient, sequencer, depth, capture kit,
+//! and variant caller.
 
 // Column indices are harcoded to match merged.csv:
-// 0=Type, 1=Filter, 13=METRIC.F1_Score, 19=patient, 20=capture, 21=sequencer, 22=depth
+// 0=Type, 1=Filter, 13=METRIC.F1_Score, 19=patient, 20=capture, 21=sequencer, 22=depth,
+// 23=variant_caller
 
 use std::path::PathBuf;
 use vega_lite_4::*;
@@ -75,6 +77,7 @@ pub fn plot(input: PathBuf, _output: PathBuf) -> Result<(), Box<dyn std::error::
             make_row("20", false)?, // capture
             make_row("21", false)?, // sequencer
             make_row("22", false)?, // depth
+            make_row("23", false)?, // variant_caller
         ])
         .spacing(Spacing::Double(30.0))
         .config(

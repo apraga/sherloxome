@@ -31,7 +31,9 @@ For each VCF whose filename contains recognisable run metadata (patient, sequenc
 3. Generates an RTG SDF from the reference FASTA on first run (`rtg format`)
 4. Runs `hap.py` with the `vcfeval` engine (single-threaded per run; VCFs are processed in parallel)
 5. Writes per-run hap.py summaries to the output directory
-6. Merges all summaries into `merged.csv`, adding `patient`, `capture`, `sequencer`, `depth` columns
+6. Merges all summaries into `merged.csv`, adding `patient`, `capture`, `sequencer`, `depth`, `variant_caller` columns
+
+`variant_caller` is derived from whatever follows the run portion of the query VCF's filename (e.g. `HG002_hiseq4000_agilent_50x.haplotypecaller.vcf.gz` → `haplotypecaller`); it's empty when the filename carries nothing beyond the run itself.
 
 ## Output files
 
@@ -69,6 +71,7 @@ The chart shows F1-score distributions broken down by:
 - Capture kit (Agilent, IDT, TruSeq)
 - Sequencer (HiSeq4000, NovaSeq)
 - Depth (50x, 75x, 100x)
+- Variant caller (e.g. haplotypecaller)
 
 Only `PASS` variants are included in the plot.
 

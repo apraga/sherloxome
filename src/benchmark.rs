@@ -33,7 +33,7 @@ pub fn analyze(
     input_dir: PathBuf,
     output_dir: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    check_deps(&["rtg"]);
+    check_deps(&["rtg", "hap.py"]);
     create_dir_all(&output_dir)?;
     let fasta = resolve_fasta(&conf.fasta)?;
     let rtg_fasta = match &conf.rtg_fasta {
@@ -209,6 +209,18 @@ fn silico_run_to_happy(
 //     filename.trim_end_matches(".bam").to_string()
 // }
 
+/// Derive the variant caller name from a hap.py prefix, i.e. whatever the query VCF's filename
+/// carries after the `SAMPLE_SEQUENCER_CAPTURE_DEPTH{_SILICO}` run portion (see `crate::run`).
+///
+/// E.g. for `HG002_hiseq4000_agilent_50x.haplotypecaller.vcf.gz`, `run_to_string` yields
+/// `HG002_hiseq4000_agilent_50x` and this returns `Some("haplotypecaller")`. Returns `None` when
+/// there is nothing left, e.g. bare silico truth VCFs named exactly after their run.
+fn variant_caller_from_prefix(prefix: &str, run: &Run) -> Option<String> {
+    let rest = prefix.strip_prefix(&run_to_string(run))?;
+    let caller = rest.trim_start_matches(['.', '_']);
+    (!caller.is_empty()).then(|| caller.to_string())
+}
+
 /// Merge all hap.py summary CSVs in output_dir into a single merged.csv with run metadata columns.
 ///
 /// `candidates`/`matched`/`validated`/`happy_failures` describe how many runs made it through
@@ -240,6 +252,7 @@ fn merge_summaries(
                 .and_then(|n| n.strip_suffix(".summary.csv"))
                 .ok_or("Failed to derive prefix from summary filename")?
                 .to_string();
+            let variant_caller = variant_caller_from_prefix(&prefix, &run).unwrap_or_default();
             Ok(CsvReadOptions::default()
                 .with_has_header(true)
                 .try_into_reader_with_file_path(Some(path))?
@@ -249,7 +262,8 @@ fn merge_summaries(
                 .with_column(lit(run.sample).alias("patient"))
                 .with_column(lit(run.capture.to_string()).alias("capture"))
                 .with_column(lit(run.sequencer.to_string()).alias("sequencer"))
-                .with_column(lit(run.depth.to_string()).alias("depth")))
+                .with_column(lit(run.depth.to_string()).alias("depth"))
+                .with_column(lit(variant_caller).alias("variant_caller")))
         })
         .collect::<Result<_, _>>()?;
 
@@ -360,4 +374,43 @@ fn validate_files(paths: &[&PathBuf]) -> Option<()> {
         return None;
     }
     Some(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(silico: Option<&str>) -> Run {
+        Run {
+            sample: "HG002".to_string(),
+            sequencer: "hiseq4000".to_string(),
+            capture: "agilent".to_string(),
+            depth: 50,
+            silico: silico.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn variant_caller_from_prefix_real_run() {
+        let prefix = "HG002_hiseq4000_agilent_50x.haplotypecaller";
+        assert_eq!(
+            variant_caller_from_prefix(prefix, &run(None)),
+            Some("haplotypecaller".to_string())
+        );
+    }
+
+    #[test]
+    fn variant_caller_from_prefix_silico_run() {
+        let prefix = "HG002_hiseq4000_agilent_50x_varben.haplotypecaller";
+        assert_eq!(
+            variant_caller_from_prefix(prefix, &run(Some("varben"))),
+            Some("haplotypecaller".to_string())
+        );
+    }
+
+    #[test]
+    fn variant_caller_from_prefix_no_caller() {
+        let prefix = "HG002_hiseq4000_agilent_50x";
+        assert_eq!(variant_caller_from_prefix(prefix, &run(None)), None);
+    }
 }
