@@ -6,6 +6,7 @@ clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
 nb_variants = 2
 
 [silico.simuscop]
+capture = "agilent-col6a1"
 # Pre-built profile: skips seqToProfile (and the BAM/VCF it would need)
 profile = "data/ref/hiseq4000_agilent-col6a1_50x.profile"
 # simuscop treats `coverage` as a peak/max rather than a realized mean, so this is scaled

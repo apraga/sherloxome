@@ -6,6 +6,7 @@ clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
 nb_variants = 2
 
 [silico.varben]
+capture = "agilent-col6a1"
 bam_files = ["data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"]
 
 [capture]

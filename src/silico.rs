@@ -32,6 +32,7 @@ use std::thread;
 /// guide](https://apraga.github.io/sherloxome/022-dbsnp.html#configuration).
 #[derive(Deserialize, Debug)]
 pub struct SilicoSimuscopConfig {
+    pub capture: String,
     /// Path to a pre-built seqToProfile profile directory. See the [GIAB
     /// example](https://apraga.github.io/sherloxome/0211-simuscop.html#giab-example) for how to
     /// obtain one.
@@ -46,6 +47,7 @@ pub struct SilicoSimuscopConfig {
 /// [silico.varben] — presence enables varben BAM editing
 #[derive(Deserialize, Debug)]
 pub struct SilicoVarbenConfig {
+    pub capture: String,
     /// BAM files to edit, one per patient/sequencer/depth combination to cover. Each must
     /// already exist locally (no URL support — the filename itself is how the run's
     /// patient/sequencer/depth are recovered, via the SAMPLE_SEQUENCER_CAPTURE_DEPTHx
@@ -75,7 +77,7 @@ pub struct SilicoConfig {
 pub fn generate_controls(
     silico: &SilicoConfig,
     bed: PathBuf,
-    capture: &str,
+    clinvar_capture: &str,
     fasta: PathBuf,
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
     check_deps(&["bwa", "samtools", "tabix", "bcftools", "muteditor"]);
@@ -87,7 +89,7 @@ pub fn generate_controls(
 
     let mut rows: Vec<SamplesheetRow> = Vec::new();
 
-    let vcf_out = outdir.join(format!("clinvar_{capture}.vcf.gz"));
+    let vcf_out = outdir.join(format!("clinvar_{clinvar_capture}.vcf.gz"));
     let (variants, header) = sample_clinvar(
         silico.clinvar.clone(),
         PathBuf::from(bed.clone()),
@@ -96,20 +98,17 @@ pub fn generate_controls(
         vcf_out.clone(),
     )?;
     if let Some(varben) = &silico.varben {
-        generate_controls_varben(
-            capture, &fasta, &variants, &header, &outdir, varben, &mut rows,
-        )?;
+        generate_controls_varben(&fasta, &variants, &header, &outdir, varben, &mut rows)?;
     }
     if let Some(simuscop) = &silico.simuscop {
         generate_controls_simuscop(
-            &silico, &bed, &fasta, &variants, &header, &outdir, simuscop, &vcf_out, &mut rows,
+            &bed, &fasta, &variants, &header, &outdir, simuscop, &vcf_out, &mut rows,
         )?;
     }
     Ok(rows)
 }
 
 fn generate_controls_varben(
-    capture: &str,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
     header: &vcf::Header,
@@ -132,30 +131,29 @@ fn generate_controls_varben(
                 bam_path
             )
         })?;
-        if run.capture != capture {
+        if run.capture != varben.capture {
             return Err(format!(
-                "BAM {:?} is for capture '{}' but [silico] capture is '{}': list only BAMs for \
+                "BAM {:?} is for capture '{}' but [silico.varben] capture is '{}': list only BAMs for \
                  this capture kit here, and run `setup` once per kit to cover several",
-                bam_path, run.capture, capture
+                bam_path, run.capture, varben.capture
             )
             .into());
         }
         let (fq1, fq2) = varben::generate_controls_bam(
             &bam_path,
-            capture,
+            &varben.capture,
             fasta,
             variants,
             header,
             varben.mindepth,
             outdir,
         )?;
-        rows.push(silico_row("varben", capture, fq1, fq2));
+        rows.push(silico_row("varben", &varben.capture, fq1, fq2));
     }
     Ok(())
 }
 
 fn generate_controls_simuscop(
-    silico: &SilicoConfig,
     bed: &PathBuf,
     fasta: &PathBuf,
     variants: &Vec<RecordBuf>,
@@ -174,7 +172,7 @@ fn generate_controls_simuscop(
         simuscop.coverage
     );
 
-    let capture = silico.capture.as_str();
+    let capture = simuscop.capture.as_str();
     let dbsnp_vcf = dbsnp::sample_dbsnp(capture, clinvar_vcf, outdir)?;
     let snp_path = outdir.join(format!("dbsnp_{capture}.snp"));
     dbsnp::write_snp_input(&dbsnp_vcf, &snp_path)?;
