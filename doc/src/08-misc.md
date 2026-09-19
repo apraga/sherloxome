@@ -80,3 +80,22 @@ To run setup for multiple configuration, for example with a Slurm array:
 - `prepare` must run once to sample variants only once
 - `simuscop` and `varben` can be run for multiple profiles. You can put them in a Slurm array. They will fail with an error instead of sampling if they are missing.
 - `samplesheet` will merge all fastq generated in a single samplesheet
+
+To run multiple simuscop with a slurm array, create a list of profiles
+
+Then run `sbatch` on this script
+
+```
+  
+#!/bin/bash -l
+
+#SBATCH --job-name="simuscop"
+#SBATCH -t 04:00:00
+#SBATCH --partition=???
+#SBATCH -c 4  ## request 16 cores (MAX is 32)
+#SBATCH --mem=12G ## (MAX is 96G)
+#SBATCH --array=1-15
+sed -n "${SLURM_ARRAY_TASK_ID}p" scripts/profiles.txt
+./sherloxome setup simuscop --profile $(sed -n "${SLURM_ARRAY_TASK_ID}p" scripts/profiles.txt)
+#+end_src
+```
