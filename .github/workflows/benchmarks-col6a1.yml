@@ -133,10 +133,17 @@ jobs:
 
       # Simuscop uses the pre-built profile committed in data/ref/, so no BWA index
       # or seqToProfile run is needed here (unlike the varben job).
-      - name: Run setup
+      # Run each setup step on its own, as one would in a Slurm job array. The varben job
+      # runs the whole `setup` at once.
+      - name: Run setup steps
         run: |
-          nix shell .#default --command \
-            ./target/release/sherloxome setup --config conf/config-simuscop-ci.toml
+          nix shell .#default --command bash -euo pipefail -c '
+            profile=data/ref/profiles/hiseq4000_agilent-col6a1_50x.profile
+            conf=conf/config-simuscop-ci.toml
+            ./target/release/sherloxome setup prepare --config $conf --profile $profile
+            ./target/release/sherloxome setup simuscop --config $conf --profile $profile
+            ./target/release/sherloxome setup samplesheet --config $conf
+          '
 
       - name: Run sarek pipeline
         run: |

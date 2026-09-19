@@ -105,7 +105,7 @@ fn download_file(url: &str, outdir: &PathBuf) -> Result<PathBuf, Box<dyn Error>>
 }
 
 /// Panic if dependcies are missing from PATH
-pub fn check_deps(tools: &[&str]) {
+pub fn check_deps(tools: Vec<&str>) {
     log::debug!("Checking dependencies");
     for tool in tools {
         match which(tool) {

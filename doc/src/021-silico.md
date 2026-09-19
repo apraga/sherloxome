@@ -27,9 +27,6 @@ clinvar = "data/exp_raw/clinvar_col6a1.vcf.gz"
 nb_variants = 2
  URL to fasta, or link to local version, otherwise download it from NCBI
  fasta =  "https://github.com/nf-core/test-datasets/blob/sarek3/data/genomics/homo_sapiens/genome/chr21/sequence/genome.fasta"
-```
-
-```toml
  Capture kit name (the BED must be defined in [capture] below)
 capture = "agilent"
 ```

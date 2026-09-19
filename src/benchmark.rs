@@ -33,7 +33,7 @@ pub fn analyze(
     input_dir: PathBuf,
     output_dir: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    check_deps(&["rtg", "hap.py"]);
+    check_deps(vec!["rtg", "hap.py"]);
     create_dir_all(&output_dir)?;
     let fasta = resolve_fasta(&conf.fasta)?;
     let rtg_fasta = match &conf.rtg_fasta {

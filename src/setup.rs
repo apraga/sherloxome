@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Configuration file for the user definig which GIAB data and which in silico data
 #[derive(Deserialize, Debug)]
@@ -172,6 +172,9 @@ fn download_giab_runs(runs: &HashSet<Run>) {
 ///
 /// Depending on what is present in `conf`, downloads GIAB data and/or generates
 /// in silico controls, then writes one `samplesheet-{capture}.csv` per capture kit.
+///
+/// This is [`prepare`], every simuscop/varben run of the configuration then [`samplesheet`].
+/// Each step is also available on its own, to spread the runs over a job array.
 pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
     let mut rows: Vec<SamplesheetRow> = Vec::new();
     if conf.real.is_none() && conf.silico.is_none() {
@@ -180,24 +183,132 @@ pub fn setup(conf: Config) -> Result<(), Box<dyn Error>> {
 
     if let Some(real) = &conf.real {
         log::debug!("Real patients selected");
-        let runs = filter_available_runs(real);
-        download_giab_runs(&runs);
-        rows.extend(runs.iter().map(real_row));
+        rows.extend(prepare_real(real));
     }
 
     if let Some(silico) = &conf.silico {
         log::debug!("Silico patients selected");
         let capture_str = &silico.capture;
-        let bed = conf
-            .capture
-            .get(capture_str)
-            .ok_or("no BED for silico capture")?;
+        let bed = silico_bed(&conf, silico)?;
         let fasta = resolve_fasta(&conf.fasta)?;
-        let rows_silico = generate_controls(silico, PathBuf::from(bed), capture_str, fasta)?;
+        let rows_silico = generate_controls(silico, bed, capture_str, fasta)?;
         rows.extend(rows_silico);
     }
     write_samplesheet(rows)?;
     Ok(())
+}
+
+/// Download the reference files of real patients and return their samplesheet rows
+fn prepare_real(real: &RealConfig) -> Vec<SamplesheetRow> {
+    let runs = filter_available_runs(real);
+    download_giab_runs(&runs);
+    runs.iter().map(real_row).collect()
+}
+
+fn silico_config(conf: &Config) -> Result<&SilicoConfig, Box<dyn Error>> {
+    conf.silico
+        .as_ref()
+        .ok_or_else(|| "config has no [silico] section".into())
+}
+
+/// The capture BED clinvar variants are sampled from
+fn silico_bed(conf: &Config, silico: &SilicoConfig) -> Result<PathBuf, Box<dyn Error>> {
+    conf.capture
+        .get(&silico.capture)
+        .map(PathBuf::from)
+        .ok_or_else(|| "no BED for silico capture".into())
+}
+
+/// `setup prepare`: everything the runs share, done once before them.
+///
+/// - download the reference files of real patients
+/// - for silico data, sample clinvar (and dbSNP for each simuscop capture kit) and make sure
+///   the reference FASTA (and its BWA index for varben) exist
+///
+/// `profiles` and `bams` are the simuscop and varben runs to prepare for, defaulting to those
+/// of the configuration.
+pub fn prepare(
+    conf: &Config,
+    profiles: &[PathBuf],
+    bams: &[PathBuf],
+) -> Result<(), Box<dyn Error>> {
+    if conf.real.is_none() && conf.silico.is_none() {
+        return Err("Nothing to do: config must have at least one of [real] or [silico]".into());
+    }
+    if let Some(real) = &conf.real {
+        prepare_real(real);
+    }
+    if let Some(silico) = &conf.silico {
+        let (captures, bams): (Vec<String>, Vec<PathBuf>) =
+            if profiles.is_empty() && bams.is_empty() {
+                (
+                    silico.simuscop.iter().map(|s| s.capture.clone()).collect(),
+                    silico
+                        .varben
+                        .iter()
+                        .flat_map(|v| v.bam_files.clone())
+                        .collect(),
+                )
+            } else {
+                (
+                    profiles
+                        .iter()
+                        .map(|p| SilicoSimuscopConfig::from_profile(p).map(|s| s.capture))
+                        .collect::<Result<_, _>>()?,
+                    bams.to_vec(),
+                )
+            };
+        if captures.is_empty() && bams.is_empty() {
+            return Err(
+                "Nothing to prepare: add a [silico.simuscop] or [silico.varben] section, or pass --profile/--bam"
+                    .into(),
+            );
+        }
+        let bed = silico_bed(conf, silico)?;
+        let fasta = resolve_fasta(&conf.fasta)?;
+        prepare_controls(silico, bed, &silico.capture, &fasta, &captures, &bams)?;
+    }
+    Ok(())
+}
+
+/// `setup simuscop`: generate the FASTQ of a single profile. Needs `setup prepare` beforehand.
+/// Capture kit and coverage come from the profile filename.
+pub fn simuscop(conf: &Config, profile: &Path) -> Result<(), Box<dyn Error>> {
+    let silico = silico_config(conf)?;
+    let simuscop = SilicoSimuscopConfig::from_profile(profile)?;
+    let bed = silico_bed(conf, silico)?;
+    let fasta = resolve_fasta(&conf.fasta)?;
+    let row = generate_simuscop(silico, &silico.capture, &bed, &fasta, &simuscop)?;
+    log::info!("Generated {}", row.fastq_1);
+    Ok(())
+}
+
+/// `setup varben`: insert variants in a single BAM. Needs `setup prepare` beforehand.
+/// Capture kit comes from the BAM filename.
+pub fn varben(conf: &Config, bam: &Path) -> Result<(), Box<dyn Error>> {
+    let silico = silico_config(conf)?;
+    let fasta = resolve_fasta(&conf.fasta)?;
+    let row = generate_varben_single(silico, &silico.capture, &fasta, &bam.to_path_buf())?;
+    log::info!("Generated {}", row.fastq_1);
+    Ok(())
+}
+
+/// `setup samplesheet`: write the samplesheets of the real patients of the configuration and
+/// of every silico FASTQ found in the silico output directory.
+pub fn samplesheet(conf: &Config) -> Result<(), Box<dyn Error>> {
+    let mut rows: Vec<SamplesheetRow> = Vec::new();
+    if let Some(real) = &conf.real {
+        rows.extend(filter_available_runs(real).iter().map(real_row));
+    }
+    if let Some(silico) = &conf.silico {
+        rows.extend(silico_rows_from_disk(&silico_outdir(silico))?);
+    }
+    if rows.is_empty() {
+        return Err(
+            "No FASTQ found for the samplesheet: run `setup simuscop`/`setup varben` first".into(),
+        );
+    }
+    write_samplesheet(rows)
 }
 
 /// Build a samplesheet row for an in silico sample.

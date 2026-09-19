@@ -3,7 +3,7 @@
 use crate::check_deps;
 use crate::dbsnp;
 use crate::download_blocking;
-use crate::run::run_from_filename;
+use crate::run::{Run, run_from_filename};
 use crate::setup::{SamplesheetRow, silico_row};
 use crate::simuscop;
 use crate::varben;
@@ -19,7 +19,7 @@ use noodles::vcf::variant::record_buf::AlternateBases as AltBasesBuf;
 use rand::RngExt;
 use rand::prelude::IteratorRandom;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -72,7 +72,106 @@ pub struct SilicoConfig {
     pub varben: Option<SilicoVarbenConfig>,
 }
 
+impl SilicoSimuscopConfig {
+    /// Build the config from a profile filename alone: capture and coverage are the ones
+    /// encoded in `SEQUENCER_CAPTURE_DEPTHx.profile`.
+    pub fn from_profile(profile: &Path) -> Result<Self, Box<dyn Error>> {
+        let run = simuscop::run_from_profile(profile)?;
+        Ok(Self {
+            capture: run.capture,
+            profile: profile.to_path_buf(),
+            coverage: run.depth,
+        })
+    }
+}
+
+/// Where the silico intermediate files and FASTQ are written
+pub fn silico_outdir(silico: &SilicoConfig) -> PathBuf {
+    silico
+        .outdir
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("data/exp_raw"))
+}
+
+/// Sampled clinvar variants, shared by all the runs (see [`prepare_controls`])
+fn sampled_clinvar_path(outdir: &Path, clinvar_capture: &str) -> PathBuf {
+    outdir.join(format!("clinvar_{clinvar_capture}.vcf.gz"))
+}
+
+/// dbSNP variants given to simuReads for a capture kit (see [`prepare_controls`])
+fn simuscop_snp_path(outdir: &Path, capture: &str) -> PathBuf {
+    outdir.join(format!("dbsnp_{capture}.snp"))
+}
+
+/// Write the inputs shared by all the runs, must be done before generating FASTQ
+/// - sample clinvar variants inside `bed` (or reuse the ones already sampled)
+/// - for every capture of `simuscop_captures`, sample dbSNP variants
+/// - if there are varben `bams`, make sure the BWA index of `fasta` exists
+pub fn prepare_controls(
+    silico: &SilicoConfig,
+    bed: PathBuf,
+    clinvar_capture: &str,
+    fasta: &Path,
+    simuscop_captures: &[String],
+    bams: &[PathBuf],
+) -> Result<(), Box<dyn Error>> {
+    let mut tools = vec!["tabix"];
+    if !simuscop_captures.is_empty() {
+        tools.push("bcftools");
+    }
+    check_deps(tools);
+    let outdir = silico_outdir(silico);
+    let clinvar_vcf = sampled_clinvar_path(&outdir, clinvar_capture);
+    sample_clinvar(
+        silico.clinvar.clone(),
+        bed,
+        50,
+        silico.nb_variants,
+        clinvar_vcf.clone(),
+    )?;
+
+    for capture in simuscop_captures.iter().collect::<BTreeSet<_>>() {
+        let dbsnp_vcf = dbsnp::sample_dbsnp(capture, &clinvar_vcf, &outdir)?;
+        dbsnp::write_snp_input(&dbsnp_vcf, &simuscop_snp_path(&outdir, capture))?;
+    }
+    if !bams.is_empty() {
+        varben::ensure_bwa_index(&fasta.to_path_buf())?;
+    }
+    Ok(())
+}
+
+/// Variants sampled by [`prepare_controls`]
+fn load_sampled_clinvar(
+    outdir: &Path,
+    clinvar_capture: &str,
+) -> Result<(Vec<RecordBuf>, vcf::Header), Box<dyn Error>> {
+    let path = sampled_clinvar_path(outdir, clinvar_capture);
+    if !path.exists() {
+        return Err(format!(
+            "{} not found: run `sherloxome setup prepare` first",
+            path.display()
+        )
+        .into());
+    }
+    read_vcf(&path)
+}
+
+/// Check that a varben BAM exists and follows the filenaming scheme
+fn varben_run(bam: &PathBuf) -> Result<Run, Box<dyn Error>> {
+    if !bam.exists() {
+        return Err(format!("BAM file not found: {}", bam.display()).into());
+    }
+    run_from_filename(bam).ok_or_else(|| {
+        format!(
+            "BAM file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx filenaming scheme",
+            bam
+        )
+        .into()
+    })
+}
+
 /// Generate controls from clinvar data and either a BAM file (real patient) or 100% in silico
+/// Runs [`prepare_controls`], then every varben and simuscop run of the configuration.
 /// Returns a list of samplesheet rows for writing
 pub fn generate_controls(
     silico: &SilicoConfig,
@@ -80,39 +179,50 @@ pub fn generate_controls(
     clinvar_capture: &str,
     fasta: PathBuf,
 ) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
-    check_deps(&["bwa", "samtools", "tabix", "bcftools", "muteditor"]);
+    let mut tools = vec!["tabix", "bcftools"];
+    if silico.simuscop.is_some() {
+        tools.push("simuReads");
+    }
+    if silico.varben.is_some() {
+        tools.extend(["bwa", "samtools", "muteditor"]);
+    }
+    check_deps(tools);
 
-    let outdir = silico
-        .outdir
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("data/exp_raw"));
+    let captures: Vec<String> = silico.simuscop.iter().map(|s| s.capture.clone()).collect();
+    let bams: Vec<PathBuf> = silico
+        .varben
+        .iter()
+        .flat_map(|v| v.bam_files.clone())
+        .collect();
+    prepare_controls(
+        silico,
+        bed.clone(),
+        clinvar_capture,
+        &fasta,
+        &captures,
+        &bams,
+    )?;
 
     let mut rows: Vec<SamplesheetRow> = Vec::new();
-
-    let vcf_out = outdir.join(format!("clinvar_{clinvar_capture}.vcf.gz"));
-    let (variants, header) = sample_clinvar(
-        silico.clinvar.clone(),
-        PathBuf::from(bed.clone()),
-        50,
-        silico.nb_variants,
-        vcf_out.clone(),
-    )?;
     if let Some(varben) = &silico.varben {
-        generate_controls_varben(&fasta, &variants, &header, &outdir, varben, &mut rows)?;
+        try_generate_varben(silico, clinvar_capture, &fasta, varben, &mut rows)?
     }
     if let Some(simuscop) = &silico.simuscop {
-        generate_controls_simuscop(
-            &bed, &fasta, &variants, &header, &outdir, simuscop, &vcf_out, &mut rows,
-        )?;
+        rows.push(generate_simuscop(
+            silico,
+            clinvar_capture,
+            &bed,
+            &fasta,
+            simuscop,
+        )?);
     }
     Ok(rows)
 }
 
-fn generate_controls_varben(
+fn try_generate_varben(
+    silico: &SilicoConfig,
+    clinvar_capture: &str,
     fasta: &PathBuf,
-    variants: &Vec<RecordBuf>,
-    header: &vcf::Header,
-    outdir: &PathBuf,
     varben: &SilicoVarbenConfig,
     rows: &mut Vec<SamplesheetRow>,
 ) -> Result<(), Box<dyn Error>> {
@@ -120,49 +230,57 @@ fn generate_controls_varben(
         log::error!("[silico.varben] requires at least one entry in bam_files");
         return Err("[silico.varben] requires at least one entry in bam_files".into());
     }
-    for bam_path in &varben.bam_files {
-        if !bam_path.exists() {
-            return Err(format!("BAM file not found: {}", bam_path.display()).into());
-        }
-
-        let run = run_from_filename(&bam_path).ok_or_else(|| {
-            format!(
-                "BAM file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx filenaming scheme",
-                bam_path
-            )
-        })?;
+    for bam in &varben.bam_files {
+        let run = varben_run(bam)?;
         if run.capture != varben.capture {
             return Err(format!(
-                "BAM {:?} is for capture '{}' but [silico.varben] capture is '{}': list only BAMs for \
-                 this capture kit here, and run `setup` once per kit to cover several",
-                bam_path, run.capture, varben.capture
-            )
-            .into());
+                    "BAM {:?} is for capture '{}' but [silico.varben] capture is '{}': list only BAMs for \
+                     this capture kit here, and run `setup` once per kit to cover several",
+                    bam, run.capture, varben.capture
+                )
+                .into());
         }
-        let (fq1, fq2) = varben::generate_controls_bam(
-            &bam_path,
-            &varben.capture,
-            fasta,
-            variants,
-            header,
-            varben.mindepth,
-            outdir,
-        )?;
-        rows.push(silico_row("varben", &varben.capture, fq1, fq2));
+        rows.push(generate_varben_single(silico, clinvar_capture, fasta, bam)?);
     }
     Ok(())
 }
 
-fn generate_controls_simuscop(
+/// Run varben to insert sampled clinvar variants into a single `bam` and convert it to FASTQ.
+/// [`prepare_controls`] must have been run before.
+pub fn generate_varben_single(
+    silico: &SilicoConfig,
+    clinvar_capture: &str,
+    fasta: &PathBuf,
+    bam: &PathBuf,
+) -> Result<SamplesheetRow, Box<dyn Error>> {
+    check_deps(vec!["bwa", "samtools", "tabix", "muteditor"]);
+    let run = varben_run(bam)?;
+    let outdir = silico_outdir(silico);
+    let mindepth = silico.varben.as_ref().and_then(|v| v.mindepth);
+    let (variants, header) = load_sampled_clinvar(&outdir, clinvar_capture)?;
+
+    let (fq1, fq2) = varben::generate_controls_bam(
+        bam,
+        &run.capture,
+        fasta,
+        &variants,
+        &header,
+        mindepth,
+        &outdir,
+    )?;
+    Ok(silico_row("varben", &run.capture, fq1, fq2))
+}
+
+/// One simuscop run: generate a FASTQ from `simuscop.profile`. Needs [`prepare_controls`] to
+/// have run for `simuscop.capture`.
+pub fn generate_simuscop(
+    silico: &SilicoConfig,
+    clinvar_capture: &str,
     bed: &PathBuf,
     fasta: &PathBuf,
-    variants: &Vec<RecordBuf>,
-    header: &vcf::Header,
-    outdir: &PathBuf,
     simuscop: &SilicoSimuscopConfig,
-    clinvar_vcf: &PathBuf,
-    rows: &mut Vec<SamplesheetRow>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<SamplesheetRow, Box<dyn Error>> {
+    check_deps(vec!["simuReads", "tabix"]);
     // simuscop's `coverage` parameter behaves like a peak/max rather than a realized mean:
     // This factor was measured empirically
     const MEAN_COVERAGE_REALIZATION: f64 = 0.65;
@@ -172,23 +290,65 @@ fn generate_controls_simuscop(
         simuscop.coverage
     );
 
+    let outdir = silico_outdir(silico);
+    let (variants, header) = load_sampled_clinvar(&outdir, clinvar_capture)?;
     let capture = simuscop.capture.as_str();
-    let dbsnp_vcf = dbsnp::sample_dbsnp(capture, clinvar_vcf, outdir)?;
-    let snp_path = outdir.join(format!("dbsnp_{capture}.snp"));
-    dbsnp::write_snp_input(&dbsnp_vcf, &snp_path)?;
+    let snp_path = simuscop_snp_path(&outdir, capture);
+    if !snp_path.exists() {
+        return Err(format!(
+            "{} not found: run `sherloxome setup prepare` first",
+            snp_path.display()
+        )
+        .into());
+    }
 
     let (fq1, fq2) = simuscop::generate_controls_fastq(
-        &bed,
-        &fasta,
+        bed,
+        fasta,
         &simuscop.profile,
         &variants,
-        header,
+        &header,
         &outdir,
         coverage,
         snp_path,
     )?;
-    rows.push(silico_row("simuscop", capture, fq1, fq2));
-    Ok(())
+    Ok(silico_row("simuscop", capture, fq1, fq2))
+}
+
+/// Rebuild the samplesheet rows of every silico FASTQ pair found in `outdir`: the filename
+/// gives the capture kit and the tool (`..._simuscop_1.fq.gz`, `..._varben_1.fq.gz`).
+/// Rows are sorted by sample name.
+pub fn silico_rows_from_disk(outdir: &Path) -> Result<Vec<SamplesheetRow>, Box<dyn Error>> {
+    let mut rows = Vec::new();
+    for entry in
+        std::fs::read_dir(outdir).map_err(|e| format!("Cannot read {}: {e}", outdir.display()))?
+    {
+        let fq1 = entry?.path();
+        let Some(name) = fq1.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(prefix) = name.strip_suffix("_1.fq.gz") else {
+            continue;
+        };
+        let Some(run) = run_from_filename(&PathBuf::from(name)) else {
+            continue;
+        };
+        let Some(tool) = run
+            .silico
+            .as_deref()
+            .filter(|s| matches!(*s, "simuscop" | "varben"))
+        else {
+            continue;
+        };
+        let fq2 = outdir.join(format!("{prefix}_2.fq.gz"));
+        if !fq2.exists() {
+            log::warn!("Skipping {:?}: {:?} is missing", fq1, fq2);
+            continue;
+        }
+        rows.push(silico_row(tool, &run.capture, fq1, fq2));
+    }
+    rows.sort_by(|a, b| a.sample.cmp(&b.sample));
+    Ok(rows)
 }
 
 /// Generate controls from a BAM file and returns 2 fastq
@@ -582,6 +742,96 @@ mod tests {
         assert!(
             content.contains("snp = /data/dbsnp_agilent-col6a1.snp"),
             "missing snp"
+        );
+    }
+
+    #[test]
+    fn simuscop_config_from_profile_filename() {
+        let conf = SilicoSimuscopConfig::from_profile(Path::new(
+            "data/ref/profiles/novaseq_idt_100x.profile",
+        ))
+        .unwrap();
+        assert_eq!(conf.capture, "idt");
+        assert_eq!(conf.coverage, 100);
+        assert_eq!(
+            conf.profile,
+            PathBuf::from("data/ref/profiles/novaseq_idt_100x.profile")
+        );
+    }
+
+    #[test]
+    fn simuscop_config_from_profile_keeps_dash_in_capture() {
+        let conf =
+            SilicoSimuscopConfig::from_profile(Path::new("hiseq4000_agilent-col6a1_50x.profile"))
+                .unwrap();
+        assert_eq!(conf.capture, "agilent-col6a1");
+        assert_eq!(conf.coverage, 50);
+    }
+
+    #[test]
+    fn simuscop_config_from_bad_profile_name_fails() {
+        assert!(SilicoSimuscopConfig::from_profile(Path::new("mine.profile")).is_err());
+    }
+
+    #[test]
+    fn runs_refuse_to_sample_when_not_prepared() {
+        let dir = std::env::temp_dir().join("silico_not_prepared_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let err = load_sampled_clinvar(&dir, "agilent-idt-truseq")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("setup prepare"), "{err}");
+        // Nothing was sampled in place of the missing file
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn silico_rows_from_disk_keeps_complete_silico_pairs() {
+        let dir = std::env::temp_dir().join("silico_rows_from_disk_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        for f in [
+            "nopatient_novaseq_idt_50x_simuscop_1.fq.gz",
+            "nopatient_novaseq_idt_50x_simuscop_2.fq.gz",
+            "HG002_hiseq4000_agilent_50x_varben_1.fq.gz",
+            "HG002_hiseq4000_agilent_50x_varben_2.fq.gz",
+            // no mate
+            "nopatient_novaseq_truseq_50x_simuscop_1.fq.gz",
+            // real patient, not silico
+            "HG002_novaseq_idt_50x_1.fq.gz",
+            "HG002_novaseq_idt_50x_2.fq.gz",
+            // not a fastq
+            "nopatient_novaseq_idt_50x_simuscop.conf",
+        ] {
+            fs::write(dir.join(f), "").unwrap();
+        }
+
+        let rows = silico_rows_from_disk(&dir).unwrap();
+        let got: Vec<(&str, &str, &str)> = rows
+            .iter()
+            .map(|r| (r.patient.as_str(), r.capture.as_str(), r.sample.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                (
+                    "silico-varben",
+                    "agilent",
+                    "HG002_hiseq4000_agilent_50x_varben"
+                ),
+                (
+                    "silico-simuscop",
+                    "idt",
+                    "nopatient_novaseq_idt_50x_simuscop"
+                ),
+            ]
+        );
+        assert!(
+            rows[1]
+                .fastq_2
+                .ends_with("nopatient_novaseq_idt_50x_simuscop_2.fq.gz")
         );
     }
 }

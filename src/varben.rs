@@ -83,14 +83,16 @@ pub fn edit_bam(
     mindepth: Option<u32>,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let outdir = PathBuf::from("data/exp_raw");
-    std::fs::create_dir_all(&outdir)?;
+    // Everything muteditor reads or writes is per BAM so several BAMs can be edited at once
+    let workdir = varben_workdir(&outdir, bam);
+    std::fs::create_dir_all(&workdir)?;
     index_bam(bam)?;
 
     let bam_cleaned = remove_hard_clips(bam)?;
-    let mut_out = outdir.join(format!("clinvar_{capture}.mut"));
+    let mut_out = workdir.join(format!("clinvar_{capture}.mut"));
     write_input(&variants, &mut_out)?;
     ensure_bwa_index(&fasta)?;
-    let edited_bam = insert_variants(mut_out, bam_cleaned, outdir.clone(), &fasta, mindepth)?;
+    let edited_bam = insert_variants(mut_out, bam_cleaned, workdir, &fasta, mindepth)?;
 
     backup_failures(&bam, &outdir)?;
     write_as_vcf(bam, header, outdir, &fasta)?;
@@ -98,8 +100,15 @@ pub fn edit_bam(
     Ok(edited_bam)
 }
 
+/// Directory where varben writes its output for a given BAM: `{outdir}/varben/{bam_stem}`.
+/// It must not be shared between BAMs (`edit.sorted.bam`, `success_list.txt`... have fixed names).
+pub fn varben_workdir(outdir: &Path, bam: &Path) -> PathBuf {
+    let stem = bam.file_stem().unwrap_or_default().to_string_lossy();
+    outdir.join("varben").join(stem.as_ref())
+}
+
 fn backup_failures(bam: &PathBuf, outdir: &PathBuf) -> Result<(), Box<dyn Error>> {
-    let failed = outdir.join("varben").join("invalid_mutation.txt");
+    let failed = varben_workdir(outdir, bam).join("invalid_mutation.txt");
     let bam_stem = bam.file_stem().unwrap().to_string_lossy();
     let failed_ = outdir.join(format!("{bam_stem}_varben_failed.txt"));
     if failed.exists() {
@@ -131,7 +140,7 @@ pub fn write_as_vcf(
     outdir: PathBuf,
     fasta: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    let varben_dir = outdir.join("varben");
+    let varben_dir = varben_workdir(&outdir, bam);
     let bam_stem = bam.file_stem().unwrap().to_string_lossy();
 
     let success_list = varben_dir.join("success_list.txt");
@@ -231,15 +240,15 @@ fn write_output(w: &mut impl Write, record: &RecordBuf) -> Result<(), Box<dyn Er
 
 /// Use varben (muteditor) to insert a list of variant in a bed files. Require varben, samtools, bwa
 /// Require a reference genome and a bwa index
-/// Output folder is the varben subfolder of `outdir`
+/// Output folder is `workdir` (see [`varben_workdir`])
 pub fn insert_variants(
     mut_file: PathBuf,
     bam: PathBuf,
-    outdir: PathBuf,
+    workdir: PathBuf,
     fasta: &PathBuf,
     mindepth: Option<u32>,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    let outdir_ = outdir.join("varben");
+    let outdir_ = workdir;
     std::fs::create_dir_all(&outdir_)?;
 
     let fasta_str = fasta.to_str().ok_or("Invalid fasta path")?;
@@ -415,4 +424,21 @@ fn download_bwa_index() -> Result<(), Box<dyn Error>> {
         .into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workdir_is_distinct_for_each_bam() {
+        let out = Path::new("data/exp_raw");
+        let a = varben_workdir(out, Path::new("bams/HG002_novaseq_idt_50x.bam"));
+        let b = varben_workdir(out, Path::new("bams/HG003_novaseq_idt_50x.bam"));
+        assert_eq!(
+            a,
+            PathBuf::from("data/exp_raw/varben/HG002_novaseq_idt_50x")
+        );
+        assert_ne!(a, b);
+    }
 }

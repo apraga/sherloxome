@@ -60,9 +60,9 @@ outdir = "silico"
 | File                                    | Description                           |
 |-----------------------------------------|---------------------------------------|
 | `clinvar_{capture}.vcf.gz`              | Sampled ClinVar variants (truth VCF)  |
-| `clinvar_{capture}.mut`                 | Variants to insert                    |
-| `clinvar_{capture}_varben_failed.txt`          | Variants to insert                    |
-| `varben/edit.sorted.bam`                | BAM with variants injected            |
+| `varben/{sample}/clinvar_{capture}.mut` | Variants to insert                    |
+| `{sample}_varben_failed.txt`            | Variants that could not be inserted   |
+| `varben/{sample}/edit.sorted.bam`       | BAM with variants injected            |
 | `{sample}.vcf.gz`                       | VCF of successfully inserted variants |
 | `{sample}_1.fq.gz` / `{sample}_2.fq.gz` | Paired FASTQ ready for the pipeline   |
 

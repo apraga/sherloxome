@@ -1,4 +1,4 @@
-use crate::run::{run_from_filename, run_to_string};
+use crate::run::{Run, run_from_filename, run_to_string};
 use crate::silico::{index_vcf, nb_threads, sort_by_chromosome};
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -123,6 +123,24 @@ pub fn write_config(
     Ok(())
 }
 
+/// Infer the run (sequencer, capture, depth) from a profile filename following the
+/// `SEQUENCER_CAPTURE_DEPTHx.profile` scheme. The sample is a placeholder.
+pub fn run_from_profile(profile: &Path) -> Result<Run, Box<dyn Error>> {
+    // Add a false patient id before extracting
+    let stem = profile
+        .file_stem()
+        .ok_or("Invalid profile path")?
+        .to_string_lossy();
+    let name = PathBuf::from(format!("nopatient_{}", stem));
+    run_from_filename(&name).ok_or_else(|| {
+        format!(
+            "profile file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx{{_SILICO}} filenaming scheme",
+            name
+        )
+        .into()
+    })
+}
+
 /// Generate controls into a in-silico FASTQ from a pre-built seqToProfile `profile` directory.
 pub fn generate_controls_fastq(
     bed: &PathBuf,
@@ -135,19 +153,7 @@ pub fn generate_controls_fastq(
     snp_file: PathBuf,
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     let profile_dir = profile.to_path_buf();
-
-    // Add a false patient id before extracting
-    let profile_stem = profile_dir
-        .file_stem()
-        .ok_or("Invalid profile path")?
-        .to_string_lossy();
-    let profile2 = PathBuf::from(format!("nopatient_{}", profile_stem));
-    let run = run_from_filename(&profile2).ok_or_else(|| {
-        format!(
-            "profile file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx{{_SILICO}} filenaming scheme",
-            profile2
-        )
-    })?;
+    let run = run_from_profile(profile)?;
     let run_str = run_to_string(&run);
 
     let base = format!("{run_str}_simuscop");

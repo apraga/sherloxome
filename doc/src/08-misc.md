@@ -17,7 +17,7 @@ All long-running steps check whether their output already exists before running:
 |------|-----------|
 | File download | Output file already exists |
 | ClinVar sampling | Sampled VCF and mutation file both exist |
-| `muteditor` BAM editing | `edit.sorted.bam` exists |
+| `muteditor` BAM editing | `varben/{sample}/edit.sorted.bam` exists |
 | FASTQ generation | Both `_1.fq.gz` and `_2.fq.gz` exist |
 | hap.py analysis | `.summary.csv` exists for that run |
 
@@ -64,3 +64,19 @@ Not all (patient × sequencer × capture × depth) combinations exist in the BAI
 
 sherloxome setup -c config.toml
 ```
+
+## Running the steps separately
+
+`sherloxome setup` runs 4 steps in a row. To
+| Step | Runs | Description |
+|------|------|-------------|
+| `setup prepare` | once | Download reference data, sample clinvar and dbSNP variants |
+| `setup simuscop --profile P` | per profile | FASTQ of one simuscop profile. Capture kit and depth come from the filename `SEQUENCER_CAPTURE_DEPTHx.profile` |
+| `setup varben --bam B` | per BAM | Insert the variants in one BAM and write its FASTQ. Capture kit comes from the BAM filename |
+| `setup samplesheet` | once | Write `samplesheet-{capture}.csv` from every silico FASTQ in the output directory |
+
+To run setup for multiple configuration, for example with a Slurm array:
+
+- `prepare` must run once to sample variants only once
+- `simuscop` and `varben` can be run for multiple profiles. You can put them in a Slurm array. They will fail with an error instead of sampling if they are missing.
+- `samplesheet` will merge all fastq generated in a single samplesheet
