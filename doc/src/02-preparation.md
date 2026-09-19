@@ -64,11 +64,11 @@ mindepth = 50
 # Define here the name of alls captures and the bed file
 [capture]
 # Those values are mandatory for GIAB data (Baid 2020)
-idt = "data/capture/idt_capture.grch38.bed"
-truseq = "data/capture/truseq-dna-exome-targeted-regions-manifest-v1-2-lifted-grch38.bed"
-agilent = "data/capture/agilent.targets.grch38.bed"
+idt = "data/ref/capture/idt_capture.grch38.bed"
+truseq = "data/ref/capture/truseq-dna-exome-targeted-regions-manifest-v1-2-lifted-grch38.bed"
+agilent = "data/ref/capture/agilent.targets.grch38.bed"
 # For testing
-agilent-col6a1 = "data/capture/agilent-col6a1.targets.grch38.bed"
+agilent-col6a1 = "data/ref/capture/agilent-col6a1.targets.grch38.bed"
 ```
 
 See also the [filenaming scheme](050-filenaming.md).

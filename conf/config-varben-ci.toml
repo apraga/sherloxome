@@ -10,4 +10,4 @@ capture = "agilent-col6a1"
 bam_files = ["data/exp_raw/HG002_hiseq4000_agilent-col6a1_50x.bam"]
 
 [capture]
-agilent-col6a1 = "data/capture/agilent-col6a1.targets.grch38.bed"
+agilent-col6a1 = "data/ref/capture/agilent-col6a1.targets.grch38.bed"

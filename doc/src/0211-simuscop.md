@@ -89,7 +89,7 @@ gunzip  HG002.hiseq4000.wes-agilent.50x.gatk4.grch38.vcf.gz
 Then run seqToProfile
 
 ```bash
-seqToProfile  HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam -v HG002.hiseq4000.wes-agilent.50x.gatk4.grch38.vcf -t data/capture/agilent.targets.grch38.chr21.bed data/ref/hiseq4000_agilent_50x.profile
+seqToProfile  HG002.hiseq4000.wes-agilent.50x.dedup.grch38.bam -v HG002.hiseq4000.wes-agilent.50x.gatk4.grch38.vcf -t data/ref/capture/agilent.targets.grch38.chr21.bed data/ref/hiseq4000_agilent_50x.profile
 
 ```
 

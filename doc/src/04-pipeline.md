@@ -33,7 +33,7 @@ nextflow run nf-core/sarek \
     --tools haplotypecaller \
     --skip_tools haplotypecaller_filter \
     --wes \
-    --intervals data/capture/agilent.targets.grch38.bed
+    --intervals data/ref/capture/agilent.targets.grch38.bed
 ```
 
 ### Capture kit BED files
@@ -42,9 +42,9 @@ Configure paths in the `[capture]` section of `config.toml`:
 
 ```toml
 [capture]
-agilent = "data/capture/agilent.targets.grch38.bed"
-idt     = "data/capture/idt_capture.grch38.bed"
-truseq  = "data/capture/truseq-dna-exome.bed"
+agilent = "data/ref/capture/agilent.targets.grch38.bed"
+idt     = "data/ref/capture/idt_capture.grch38.bed"
+truseq  = "data/ref/capture/truseq-dna-exome.bed"
 ```
 
 | Key | BED source |
@@ -79,5 +79,5 @@ nextflow run nf-core/sarek \
     --tools haplotypecaller \
     --skip_tools haplotypecaller_filter \
     --wes \
-    --intervals data/capture/agilent.targets.grch38.bed
+    --intervals data/ref/capture/agilent.targets.grch38.bed
 ```

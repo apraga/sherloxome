@@ -16,4 +16,4 @@ coverage = 50
 dbsnp = true
 
 [capture]
-agilent-col6a1 = "data/capture/agilent-col6a1.targets.grch38.bed"
+agilent-col6a1 = "data/ref/capture/agilent-col6a1.targets.grch38.bed"
