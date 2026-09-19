@@ -29,7 +29,7 @@ capture = "agilent-idt-truseq"
 [silico.simuscop]
 # Pre-built seqToProfile profile directory.
 # The profile must follow the filenaming scheme
-profile = "data/ref/hiseq4000_agilent_50x.profile"
+profile = "data/ref/profiles/hiseq4000_agilent_50x.profile"
 capture = "agilent"
 # Sequencing coverage
 coverage = 50
