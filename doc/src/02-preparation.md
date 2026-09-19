@@ -72,4 +72,4 @@ agilent-col6a1 = "data/ref/capture/agilent-col6a1.targets.grch38.bed"
 ```
 
 See also the [filenaming scheme](050-filenaming.md).
-
+For parellisation of this step, see [this section](08-misc.md).
