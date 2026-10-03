@@ -3,36 +3,40 @@
 ```toml
 # This section enables simuscop FASTQ generation (remove section to disable)
 [silico.simuscop]
-# Pre-built seqToProfile profile directory. The profile must follow the filenaming scheme
-profile = "data/ref/hiseq4000_agilent_50x.profile"
-# Sequencing coverage
-coverage = 50
+# Pre-built seqToProfile profile directories, one FASTQ is generated per profile.
+# Each profile must follow the filenaming scheme SEQUENCER_CAPTURE_DEPTHx.profile
+profiles = [
+  "data/ref/profiles/hiseq4000_agilent_50x.profile",
+  "data/ref/profiles/novaseq_idt_75x.profile",
+]
 ```
 
-**Warning** : simuscop use a maximum coverage. The configuration above will be converted to an estimation for a mean coverage by dividing by 0.65 (empirical value).
+One pair of FASTQ is generated from a single profile.  The capture kit and the sequencing coverage of each run are read from the profile filename.
+So the example above generated 2 paired FASQT for 1. Agilent at 50x on a Hiseq4000 and 2. IDT at 75x on a novaseq.
 
-Simuscop generates a FASTQ from a pre-built seqToProfile `profile`. `sherloxome` ships:
+**Warning** : simuscop use a maximum coverage. The depth above will be converted to an estimation for a mean coverage by dividing by 0.65 (empirical value).
 
-| Profile path                                | Sequencer  | Kit     | Depth |
-| ------------------------------------------- | ---------- | ------- | ----- |
-| data/exp_raw/hiseq4000-agilent-50x.profile  | Hiseq 4000 | Agilent | 50x   |
-| data/exp_raw/hiseq4000-idt-50x.profile      | Hiseq 4000 | IDT     | 50x   |
-| data/exp_raw/hiseq4000-truseq-50x.profile   | Hiseq 4000 | Truseq  | 50x   |
-| data/exp_raw/hiseq4000-agilent-75x.profile  | Hiseq 4000 | Agilent | 75x   |
-| data/exp_raw/hiseq4000-idt-75x.profile      | Hiseq 4000 | IDT     | 75x   |
-| data/exp_raw/hiseq4000-truseq-75x.profile   | Hiseq 4000 | Truseq  | 75x   |
-| data/exp_raw/hiseq4000-agilent-100x.profile | Hiseq 4000 | Agilent | 100x  |
-| data/exp_raw/hiseq4000-idt-100x.profile     | Hiseq 4000 | IDT     | 100x  |
-| data/exp_raw/hiseq4000-truseq-100x.profile  | Hiseq 4000 | Truseq  | 100x  |
-| data/exp_raw/novaseq-agilent-50x.profile    | novaseq    | Agilent | 50x   |
-| data/exp_raw/novaseq-idt-50x.profile        | novaseq    | IDT     | 50x   |
-| data/exp_raw/novaseq-truseq-50x.profile     | novaseq    | Truseq  | 50x   |
-| data/exp_raw/novaseq-agilent-75x.profile    | novaseq    | Agilent | 75x   |
-| data/exp_raw/novaseq-idt-75x.profile        | novaseq    | IDT     | 75x   |
-| data/exp_raw/novaseq-truseq-75x.profile     | novaseq    | Truseq  | 75x   |
-| data/exp_raw/novaseq-agilent-100x.profile   | novaseq    | Agilent | 100x  |
-| data/exp_raw/novaseq-idt-100x.profile       | novaseq    | IDT     | 100x  |
-| data/exp_raw/novaseq-truseq-100x.profile    | novaseq    | Truseq  | 100x  |
+*Note* : simuscop profile do not depend on the patient as they reflect sequencer bias.
+
+Prebuilt profiles shipped with the code include:
+
+| Profile path                                    | Sequencer  | Kit     | Depth |
+| ----------------------------------------------- | ---------- | ------- | ----- |
+| data/ref/profiles/hiseq4000_agilent_50x.profile | Hiseq 4000 | Agilent | 50x   |
+| data/ref/profiles/hiseq4000_idt_50x.profile     | Hiseq 4000 | IDT     | 50x   |
+| data/ref/profiles/hiseq4000_truseq_50x.profile  | Hiseq 4000 | Truseq  | 50x   |
+| data/ref/profiles/hiseq4000_idt_75x.profile     | Hiseq 4000 | IDT     | 75x   |
+| data/ref/profiles/hiseq4000_truseq_75x.profile  | Hiseq 4000 | Truseq  | 75x   |
+| data/ref/profiles/hiseq4000_idt_100x.profile    | Hiseq 4000 | IDT     | 100x  |
+| data/ref/profiles/novaseq_agilent_50x.profile   | novaseq    | Agilent | 50x   |
+| data/ref/profiles/novaseq_idt_50x.profile       | novaseq    | IDT     | 50x   |
+| data/ref/profiles/novaseq_truseq_50x.profile    | novaseq    | Truseq  | 50x   |
+| data/ref/profiles/novaseq_agilent_75x.profile   | novaseq    | Agilent | 75x   |
+| data/ref/profiles/novaseq_idt_75x.profile       | novaseq    | IDT     | 75x   |
+| data/ref/profiles/novaseq_truseq_75x.profile    | novaseq    | Truseq  | 75x   |
+| data/ref/profiles/novaseq_agilent_100x.profile  | novaseq    | Agilent | 100x  |
+| data/ref/profiles/novaseq_idt_100x.profile      | novaseq    | IDT     | 100x  |
+| data/ref/profiles/novaseq_truseq_100x.profile   | novaseq    | Truseq  | 100x  |
 
 Variants inserted in the FASTQ are available as a VCF in `data/exp_raw`, for example
 `data/exp_raw/nopatient_hiseq4000_agilent_50x_simuscop.vcf.gz`.
@@ -42,7 +46,7 @@ See [the relevant section](022-dbsnp.md) for more information.
 
 ## GIAB example
 
-`data/ref/hiseq4000_agilent_50x.profile` was itself built with `seqToProfile` from a real GIAB
+`data/ref/profiles/hiseq4000_agilent_50x.profile` was itself built with `seqToProfile` from a real GIAB
 HG002 BAM (HiSeq 4000, Agilent, 50x) :
 
 
@@ -57,8 +61,7 @@ depths     = [50]
 capture = "agilent"
 
 [silico.simuscop]
-profile = "data/ref/hiseq4000_agilent_50x.profile"
-coverage = 50
+profiles = ["data/ref/profiles/hiseq4000_agilent_50x.profile"]
 ```
 
 `sherloxome setup` writes both rows into `samplesheet-agilent.csv`:
@@ -74,8 +77,8 @@ with `sherloxome benchmark` — see [Evaluate performance](05-benchmark.md).
 
 ## Building a new profile
 
-`sherloxome` no longer builds seqToProfile profiles itself — `profile` must already exist on
-disk. To add support for a new sequencer/capture/depth combination, run `seqToProfile` directly
+`sherloxome` no longer builds seqToProfile profiles itself — every entry of `profiles` must
+already exist on disk. To add support for a new sequencer/capture/depth combination, run `seqToProfile` directly
 (bundled in the `simuscop` Nix package, see `pkgs/simuscop`) against a real BAM and its called
 variants.
 

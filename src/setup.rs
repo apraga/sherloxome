@@ -226,7 +226,7 @@ fn silico_bed(conf: &Config, silico: &SilicoConfig) -> Result<PathBuf, Box<dyn E
 ///   the reference FASTA (and its BWA index for varben) exist
 ///
 /// `profiles` and `bams` are the simuscop and varben runs to prepare for, defaulting to those
-/// of the configuration.
+/// of the configuration (`[silico.simuscop] profiles` and `[silico.varben] bam_files`).
 pub fn prepare(
     conf: &Config,
     profiles: &[PathBuf],
@@ -242,7 +242,10 @@ pub fn prepare(
         let (captures, bams): (Vec<String>, Vec<PathBuf>) =
             if profiles.is_empty() && bams.is_empty() {
                 (
-                    silico.simuscop.iter().map(|s| s.capture.clone()).collect(),
+                    match &silico.simuscop {
+                        Some(simuscop) => simuscop.runs()?.into_iter().map(|s| s.capture).collect(),
+                        None => Vec::new(),
+                    },
                     silico
                         .varben
                         .iter()
@@ -253,7 +256,7 @@ pub fn prepare(
                 (
                     profiles
                         .iter()
-                        .map(|p| SilicoSimuscopConfig::from_profile(p).map(|s| s.capture))
+                        .map(|p| SimuscopRun::from_profile(p).map(|s| s.capture))
                         .collect::<Result<_, _>>()?,
                     bams.to_vec(),
                 )
@@ -275,7 +278,7 @@ pub fn prepare(
 /// Capture kit and coverage come from the profile filename.
 pub fn simuscop(conf: &Config, profile: &Path) -> Result<(), Box<dyn Error>> {
     let silico = silico_config(conf)?;
-    let simuscop = SilicoSimuscopConfig::from_profile(profile)?;
+    let simuscop = SimuscopRun::from_profile(profile)?;
     let bed = silico_bed(conf, silico)?;
     let fasta = resolve_fasta(&conf.fasta)?;
     let row = generate_simuscop(silico, &silico.capture, &bed, &fasta, &simuscop)?;

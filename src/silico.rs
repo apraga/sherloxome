@@ -32,10 +32,31 @@ use std::thread;
 /// guide](https://apraga.github.io/sherloxome/022-dbsnp.html#configuration).
 #[derive(Deserialize, Debug)]
 pub struct SilicoSimuscopConfig {
-    pub capture: String,
-    /// Path to a pre-built seqToProfile profile directory. See the [GIAB
+    /// Paths to pre-built seqToProfile profile directories, one FASTQ is generated per
+    /// profile. Capture kit and coverage are the ones encoded in the
+    /// `SEQUENCER_CAPTURE_DEPTHx.profile` filename. See the [GIAB
     /// example](https://apraga.github.io/sherloxome/0211-simuscop.html#giab-example) for how to
     /// obtain one.
+    pub profiles: Vec<PathBuf>,
+}
+
+impl SilicoSimuscopConfig {
+    /// The simuscop runs of the configuration, one per profile
+    pub fn runs(&self) -> Result<Vec<SimuscopRun>, Box<dyn Error>> {
+        if self.profiles.is_empty() {
+            return Err("[silico.simuscop] requires at least one entry in profiles".into());
+        }
+        self.profiles
+            .iter()
+            .map(|p| SimuscopRun::from_profile(p))
+            .collect()
+    }
+}
+
+/// A single simuscop run, built from its profile
+#[derive(Debug)]
+pub struct SimuscopRun {
+    pub capture: String,
     pub profile: PathBuf,
     /// Target mean sequencing coverage over the capture region. simuscop's own `coverage`
     /// parameter behaves more like a peak/max than a realized mean (see
@@ -72,8 +93,8 @@ pub struct SilicoConfig {
     pub varben: Option<SilicoVarbenConfig>,
 }
 
-impl SilicoSimuscopConfig {
-    /// Build the config from a profile filename alone: capture and coverage are the ones
+impl SimuscopRun {
+    /// Build the run from a profile filename alone: capture and coverage are the ones
     /// encoded in `SEQUENCER_CAPTURE_DEPTHx.profile`.
     pub fn from_profile(profile: &Path) -> Result<Self, Box<dyn Error>> {
         let run = simuscop::run_from_profile(profile)?;
@@ -188,7 +209,11 @@ pub fn generate_controls(
     }
     check_deps(tools);
 
-    let captures: Vec<String> = silico.simuscop.iter().map(|s| s.capture.clone()).collect();
+    let simuscop_runs = match &silico.simuscop {
+        Some(simuscop) => simuscop.runs()?,
+        None => Vec::new(),
+    };
+    let captures: Vec<String> = simuscop_runs.iter().map(|s| s.capture.clone()).collect();
     let bams: Vec<PathBuf> = silico
         .varben
         .iter()
@@ -207,7 +232,7 @@ pub fn generate_controls(
     if let Some(varben) = &silico.varben {
         try_generate_varben(silico, clinvar_capture, &fasta, varben, &mut rows)?
     }
-    if let Some(simuscop) = &silico.simuscop {
+    for simuscop in &simuscop_runs {
         rows.push(generate_simuscop(
             silico,
             clinvar_capture,
@@ -278,7 +303,7 @@ pub fn generate_simuscop(
     clinvar_capture: &str,
     bed: &PathBuf,
     fasta: &PathBuf,
-    simuscop: &SilicoSimuscopConfig,
+    simuscop: &SimuscopRun,
 ) -> Result<SamplesheetRow, Box<dyn Error>> {
     check_deps(vec!["simuReads", "tabix"]);
     // simuscop's `coverage` parameter behaves like a peak/max rather than a realized mean:
@@ -747,10 +772,9 @@ mod tests {
 
     #[test]
     fn simuscop_config_from_profile_filename() {
-        let conf = SilicoSimuscopConfig::from_profile(Path::new(
-            "data/ref/profiles/novaseq_idt_100x.profile",
-        ))
-        .unwrap();
+        let conf =
+            SimuscopRun::from_profile(Path::new("data/ref/profiles/novaseq_idt_100x.profile"))
+                .unwrap();
         assert_eq!(conf.capture, "idt");
         assert_eq!(conf.coverage, 100);
         assert_eq!(
@@ -762,15 +786,34 @@ mod tests {
     #[test]
     fn simuscop_config_from_profile_keeps_dash_in_capture() {
         let conf =
-            SilicoSimuscopConfig::from_profile(Path::new("hiseq4000_agilent-col6a1_50x.profile"))
-                .unwrap();
+            SimuscopRun::from_profile(Path::new("hiseq4000_agilent-col6a1_50x.profile")).unwrap();
         assert_eq!(conf.capture, "agilent-col6a1");
         assert_eq!(conf.coverage, 50);
     }
 
     #[test]
+    fn simuscop_config_lists_one_run_per_profile() {
+        let conf: SilicoSimuscopConfig = toml::from_str(
+            r#"profiles = ["p/hiseq4000_agilent_50x.profile", "p/novaseq_idt_75x.profile"]"#,
+        )
+        .unwrap();
+        let runs = conf.runs().unwrap();
+        let got: Vec<(&str, u32)> = runs
+            .iter()
+            .map(|r| (r.capture.as_str(), r.coverage))
+            .collect();
+        assert_eq!(got, vec![("agilent", 50), ("idt", 75)]);
+    }
+
+    #[test]
+    fn simuscop_config_without_profile_fails() {
+        let conf: SilicoSimuscopConfig = toml::from_str("profiles = []").unwrap();
+        assert!(conf.runs().is_err());
+    }
+
+    #[test]
     fn simuscop_config_from_bad_profile_name_fails() {
-        assert!(SilicoSimuscopConfig::from_profile(Path::new("mine.profile")).is_err());
+        assert!(SimuscopRun::from_profile(Path::new("mine.profile")).is_err());
     }
 
     #[test]

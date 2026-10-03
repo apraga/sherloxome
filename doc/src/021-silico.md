@@ -1,13 +1,13 @@
 # Synthetic in silico controls
 
-Silico data consits of a FAST generated either
+Silico data consist of a FASTQ generated either
 - from a patient BAM with injected Clinvar pathogenic variants with `varben`
 - purely in silico for a sequencer and capture kit based on a model with `simuscop`
 Both can be combined. See [Limitations](07-limitations.md)
 
 ## Variant selection criteria
 
-A ClinVar variant is eligible if it:
+Only ClinVar variant are retained that:
 
 - Falls within the capture kit BED intervals
 - Has `CLNSIG` of `Pathogenic`, `Likely_pathogenic`, or `Uncertain_significance`
@@ -31,7 +31,7 @@ nb_variants = 2
 capture = "agilent"
 ```
 
-Simuscop needs a pre-built seqToProfile profile, in `[silico.simuscop] profile` — see
+Simuscop needs one or several pre-built seqToProfile profiles, in `[silico.simuscop] profiles` — see
 [Silico FASTQ with simuscop](0211-simuscop.md). Varben has its own list of BAMs to edit, in
 `[silico.varben] bam_files` — see [Varben](0210-varben.md).
 

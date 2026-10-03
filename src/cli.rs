@@ -68,7 +68,7 @@ enum SetupStep {
     /// Sampling is random and its result is shared by all runs, so it must not happen
     /// in the concurrent `simuscop` and `varben` runs, which fail if it has not been done.
     Prepare {
-        /// Simuscop profiles that will be run. Default: the one of the configuration
+        /// Simuscop profiles that will be run. Default: those of the configuration
         #[arg(long, value_name = "PROFILE", num_args = 1..)]
         profile: Vec<PathBuf>,
         /// Varben BAMs that will be run. Default: those of the configuration

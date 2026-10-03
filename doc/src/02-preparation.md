@@ -50,10 +50,9 @@ capture = "agilent"
 
 # This section enables simuscop FASTQ generation
 [silico.simuscop]
-# Pre-built seqToProfile profile directory. 
-profile = "data/ref/hiseq4000_agilent_50x.profile"
-# Sequencing coverage
-coverage = 50
+# Pre-built seqToProfile profile directories, one FASTQ per profile.
+# Capture kit and coverage come from the filename
+profiles = ["data/ref/profiles/hiseq4000_agilent_50x.profile"]
 
 # This section enables varben BAM editing
 [silico.varben]

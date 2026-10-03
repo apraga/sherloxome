@@ -78,7 +78,7 @@ sherloxome setup -c config.toml
 To run setup for multiple configuration, for example with a Slurm array:
 
 - `prepare` must run once to sample variants only once
-- `simuscop` and `varben` can be run for multiple profiles. You can put them in a Slurm array. They will fail with an error instead of sampling if they are missing.
+- `simuscop` and `varben` can be run for multiple profiles. `--profile` does not need to be listed in `[silico.simuscop] profiles`: that list is what plain `sherloxome setup` runs, and the default of `prepare`. You can put them in a Slurm array. They will fail with an error instead of sampling if they are missing.
 - `samplesheet` will merge all fastq generated in a single samplesheet
 
 To run multiple simuscop with a slurm array, create a list of profiles
