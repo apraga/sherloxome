@@ -41,8 +41,7 @@ pub fn generate_controls_bam(
 
     let bam_parent = bam.parent().unwrap_or(Path::new("."));
     // Reuse the SAMPLE_SEQUENCER_CAPTURE_DEPTH parsed from the input BAM name, but
-    // stamp the silico tag as "varben" so the output follows the filenaming scheme
-    // regardless of what the input BAM was itself called (e.g. "..._nohardclip").
+    // stamp the silico tag as "varben"
     let mut run = run_from_filename(bam).ok_or_else(|| {
         format!(
             "BAM file {:?} does not follow the SAMPLE_SEQUENCER_CAPTURE_DEPTHx{{_SILICO}} filenaming scheme",
@@ -354,15 +353,18 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     let stem = bam.file_stem().unwrap().to_string_lossy();
     let parent = bam.parent().unwrap_or(Path::new("."));
     let filtered = parent.join(format!("{stem}_nohardclip.bam"));
+    // Temporary file so an interrupted run never leaves a partial BAM
+    let tmp = parent.join(format!("{stem}_nohardclip_tmp.bam"));
 
     if !filtered.exists() {
         log::info!("Removing hard clips");
+        // pipefail: a failure anywhere in the pipe must not leave a truncated BAM
         let cmd = format!(
-            "samtools view -h {} | awk '$6 !~ /H/{{print}}' | samtools view -bS - > {}",
+            "set -o pipefail; samtools view -h {} | awk '$6 !~ /H/{{print}}' | samtools view -bS - > {}",
             bam.display(),
-            filtered.display()
+            tmp.display()
         );
-        let status = Command::new("sh")
+        let status = Command::new("bash")
             .args(["-c", &cmd])
             .status()
             .expect("Failed to run hard clip filter");
@@ -370,6 +372,7 @@ pub fn remove_hard_clips(bam: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
         if !status.success() {
             return Err(format!("samtools exited with status {status}").into());
         }
+        std::fs::rename(&tmp, &filtered)?;
     } else {
         log::info!("Hardlink removal already done");
     }
