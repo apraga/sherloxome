@@ -63,7 +63,7 @@ pub fn generate_controls_bam(
         Ok((fq1, fq2))
     } else {
         log::info!("Editing BAM to insert control");
-        let new_bam = edit_bam(&bam, capture, fasta, variants, header, mindepth)?;
+        let new_bam = edit_bam(&bam, capture, fasta, variants, header, mindepth, outdir)?;
         bam_to_fastq(new_bam, fq1, fq2)
     }
 }
@@ -81,8 +81,8 @@ pub fn edit_bam(
     variants: &Vec<RecordBuf>,
     header: &vcf::Header,
     mindepth: Option<u32>,
+    outdir: &PathBuf,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    let outdir = PathBuf::from("data/exp_raw");
     // Everything muteditor reads or writes is per BAM so several BAMs can be edited at once
     let workdir = varben_workdir(&outdir, bam);
     std::fs::create_dir_all(&workdir)?;
@@ -137,7 +137,7 @@ pub fn write_input(variants: &Vec<RecordBuf>, mut_out: &PathBuf) -> Result<(), B
 pub fn write_as_vcf(
     bam: &PathBuf,
     header: &vcf::Header,
-    outdir: PathBuf,
+    outdir: &PathBuf,
     fasta: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     let varben_dir = varben_workdir(&outdir, bam);
