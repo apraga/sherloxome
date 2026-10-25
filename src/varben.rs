@@ -39,7 +39,6 @@ pub fn generate_controls_bam(
 ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
     std::fs::create_dir_all(&outdir)?;
 
-    let bam_parent = bam.parent().unwrap_or(Path::new("."));
     // Reuse the SAMPLE_SEQUENCER_CAPTURE_DEPTH parsed from the input BAM name, but
     // stamp the silico tag as "varben"
     let mut run = run_from_filename(bam).ok_or_else(|| {
@@ -50,8 +49,8 @@ pub fn generate_controls_bam(
     })?;
     run.silico = Some("varben".to_string());
     let base = run_to_string(&run);
-    let fq1 = bam_parent.join(format!("{base}_1.fq.gz"));
-    let fq2 = bam_parent.join(format!("{base}_2.fq.gz"));
+    let fq1 = outdir.join(format!("{base}_1.fq.gz"));
+    let fq2 = outdir.join(format!("{base}_2.fq.gz"));
 
     if fq1.exists() && fq2.exists() {
         log::info!(
@@ -307,7 +306,7 @@ fn run_insert_variants(
 }
 
 /// samtools fastq is the best tool in our testing. It requires read to be sorted by read name beforehand
-/// Fastq output will be in the same directory as the BAM and suffixed with _1.fq.gz
+/// Write the read pairs of `bam` to `fq1` and `fq2`
 pub fn bam_to_fastq(
     bam: PathBuf,
     fq1: PathBuf,
