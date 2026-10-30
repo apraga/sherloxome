@@ -5,7 +5,7 @@
 use crate::check_deps;
 use crate::giab;
 use crate::resolve_fasta;
-use crate::run::{Run, run_from_filename, run_to_string};
+use crate::run::{run_from_filename, run_to_string, Run};
 use crate::setup::Config; //, RealConfig, SilicoConfig, filter_available_runs};
 use glob::glob;
 use polars::lazy::prelude::*;
@@ -222,10 +222,6 @@ fn variant_caller_from_prefix(prefix: &str, run: &Run) -> Option<String> {
 }
 
 /// Merge all hap.py summary CSVs in output_dir into a single merged.csv with run metadata columns.
-///
-/// `candidates`/`matched`/`validated`/`happy_failures` describe how many runs made it through
-/// each pipeline stage (filenaming match -> truth/capture resolution -> file validation ->
-/// hap.py execution), so a descriptive error can be raised if nothing came out the other end.
 fn merge_summaries(
     output_dir: PathBuf,
     candidates: usize,
@@ -241,11 +237,6 @@ fn merge_summaries(
             let run =
                 run_from_filename(&path).ok_or("Failed to extract run from summary filename")?;
             // `run_from_filename` only matches the SAMPLE_SEQUENCER_CAPTURE_DEPTH{_SILICO}
-            // portion, so distinct query VCFs for the same run (e.g. the raw and
-            // `.filtered` HaplotypeCaller output) share identical patient/capture/sequencer/depth
-            // columns. Carry the full hap.py prefix (the summary filename minus the
-            // `.summary.csv` suffix) through as its own column so those rows stay
-            // distinguishable in merged.csv instead of looking like duplicates.
             let prefix = path
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -263,17 +254,16 @@ fn merge_summaries(
                 .with_column(lit(run.capture.to_string()).alias("capture"))
                 .with_column(lit(run.sequencer.to_string()).alias("sequencer"))
                 .with_column(lit(run.depth.to_string()).alias("depth"))
+                .with_column(lit(run.silico.unwrap_or_default().to_string()).alias("silico"))
                 .with_column(lit(variant_caller).alias("variant_caller")))
         })
         .collect::<Result<_, _>>()?;
 
     if dfs.is_empty() {
         return Err(format!(
-            "No summary CSVs found in {}: {candidates} run(s) matched the filenaming scheme, \
-             {matched} resolved a truth VCF/capture, {validated} passed file validation and ran \
-             hap.py ({happy_failures} of those failed). Runs are skipped silently at `warn`/`debug` \
-             log level — re-run with `RUST_LOG=warn` (or `debug` for more detail) to see why each \
-             run was skipped or failed.",
+            "No summary CSVs found in {} with {happy_failures} failures.
+             {candidates} run(s) matched the filenaming scheme, \
+             {matched} had a truth VCF/capture, {validated} had results",
             output_dir.display()
         )
         .into());
